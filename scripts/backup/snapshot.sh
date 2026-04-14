@@ -4,35 +4,63 @@
 # Creates timestamped backup before major changes
 
 TIMESTAMP=$(date +%Y%m%d-%H%M)
-BACKUP_DIR="/root/backups/snapshot-${TIMESTAMP}"
-DB_USER="thoughtfirst"
-DB_PASS="Q4Mz2s7Y[bAs777"
 DB_NAME="thoughtfirst"
+TEMP_DIR="/root/tmp/snapshot-${TIMESTAMP}"
+BACKUP_DIR="/root/backups"
 
 echo "🔍 Creating snapshot at ${TIMESTAMP}..."
 
-# Create backup directory
-mkdir -p ${BACKUP_DIR}
+# Create temp directory
+mkdir -p ${TEMP_DIR}
+
+# Check disk space first
+DISK_USAGE=$(df /root | tail -1 | awk '{print $5}' | sed 's/%//')
+if [ "$DISK_USAGE" -gt 85 ]; then
+    echo "⚠️  WARNING: Disk usage at ${DISK_USAGE}%. Cleaning old backups..."
+    # Keep only last 2 snapshots
+    cd ${BACKUP_DIR} && ls -t snapshot-*.tar.gz 2>/dev/null | tail -n +3 | xargs rm -f
+    echo "✅ Cleaned old snapshots"
+fi
 
 # Backup database
 echo "📦 Backing up database..."
-mysqldump -u ${DB_USER} -p'${DB_PASS}' ${DB_NAME} > ${BACKUP_DIR}/database-backup.sql
+cat > ${TEMP_DIR}/.my.cnf << EOF
+[client]
+user=thoughtfirst
+password=Q4Mz2s7Y[bAs777
+EOF
+chmod 600 ${TEMP_DIR}/.my.cnf
+mysqldump --defaults-file=${TEMP_DIR}/.my.cnf ${DB_NAME} > ${TEMP_DIR}/database-backup.sql
+rm -f ${TEMP_DIR}/.my.cnf
+
+# Verify database backup
+if [ -s ${TEMP_DIR}/database-backup.sql ]; then
+    echo "✅ Database backup successful ($(du -h ${TEMP_DIR}/database-backup.sql | cut -f1))"
+else
+    echo "⚠️  Database backup is empty!"
+fi
 
 # Backup production frontend
 echo "📦 Backing up production frontend..."
-cp -r /var/www/thoughtfirst-frontend ${BACKUP_DIR}/production-frontend
+cp -r /var/www/thoughtfirst-frontend ${TEMP_DIR}/production-frontend
 
-# Backup server code
+# Backup server code (exclude node_modules)
 echo "📦 Backing up server code..."
-cp -r /root/server ${BACKUP_DIR}/server-working
+mkdir -p ${TEMP_DIR}/server-working
+rsync -a --exclude='node_modules' --exclude='*.log' /root/server/ ${TEMP_DIR}/server-working/
 
-# Backup web app code
+# Backup web app code (exclude node_modules, dist, .git)
 echo "📦 Backing up web app code..."
-cp -r /root/nethra-thought ${BACKUP_DIR}/nethra-thought-working
+mkdir -p ${TEMP_DIR}/nethra-thought-working
+rsync -a --exclude='node_modules' --exclude='dist' --exclude='.git' --exclude='*.log' /root/nethra-thought/ ${TEMP_DIR}/nethra-thought-working/
+
+# Get git status
+GIT_LOG=$(cd /root/pos-v1 && git log --oneline -1)
+GIT_BRANCH=$(cd /root/pos-v1 && git branch --show-current)
 
 # Create SNAPSHOT.md
 echo "📦 Creating snapshot documentation..."
-cat > ${BACKUP_DIR}/SNAPSHOT.md << EOF
+cat > ${TEMP_DIR}/SNAPSHOT.md << EOF
 # NETHRA POS-v1 Snapshot
 
 ## Timestamp: ${TIMESTAMP}
@@ -40,15 +68,18 @@ cat > ${BACKUP_DIR}/SNAPSHOT.md << EOF
 ## Time: $(date +%H:%M:%S)
 
 ## Git Status
-$(cd /root/pos-v1 && git log --oneline -1)
+${GIT_LOG}
 
-## Branch: $(cd /root/pos-v1 && git branch --show-current)
+## Branch: ${GIT_BRANCH}
 
 ## Files Backed Up:
-$(ls -lah ${BACKUP_DIR}/)
+$(ls -lah ${TEMP_DIR}/)
 
 ## Database Size:
-$(du -h ${BACKUP_DIR}/database-backup.sql)
+$(du -h ${TEMP_DIR}/database-backup.sql)
+
+## Disk Usage:
+$(df -h /root | tail -1)
 
 ## Reason for Snapshot:
 [Fill this in before running]
@@ -66,8 +97,9 @@ EOF
 
 # Compress backup
 echo "📦 Compressing backup..."
-tar -czf ${BACKUP_DIR}.tar.gz -C /root/backups snapshot-${TIMESTAMP}
-rm -rf ${BACKUP_DIR}
+tar -czf ${BACKUP_DIR}/snapshot-${TIMESTAMP}.tar.gz -C ${TEMP_DIR} .
+rm -rf ${TEMP_DIR}
 
-echo "✅ Snapshot created: ${BACKUP_DIR}.tar.gz"
-echo "📍 Location: /root/backups/"
+echo "✅ Snapshot created: ${BACKUP_DIR}/snapshot-${TIMESTAMP}.tar.gz"
+echo "📍 Location: ${BACKUP_DIR}/"
+echo "💾 Size: $(du -h ${BACKUP_DIR}/snapshot-${TIMESTAMP}.tar.gz | cut -f1)"
