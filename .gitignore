@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+.pnp/
+
+# Build outputs
+dist/
+build/
+
+# Environment
+.env
+.env.local
+.env.production
+*.pem
+*.key
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# PM2
+.pm2/
+
+# Database
+*.sql
+!migrations/
+
+# Secrets
+secrets/
+credentials/

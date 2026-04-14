@@ -1,0 +1,90 @@
+const express = require('express');
+const mysql = require('mysql2/promise');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
+const crypto = require('crypto');
+
+const app = express();
+app.use(express.json());
+
+// Service imports with error boundaries
+let briefingService = null;
+let aiService = null;
+let whatsappService = null;
+
+try {
+  briefingService = require('./services/briefing');
+  console.log('Briefing service loaded successfully');
+} catch (err) {
+  console.warn('Briefing service failed to load:', err.message);
+}
+
+try {
+  aiService = require('./services/ai');
+  console.log('AI service loaded successfully');
+} catch (err) {
+  console.warn('AI service failed to load:', err.message);
+}
+
+try {
+  whatsappService = require('./services/whatsapp');
+  console.log('WhatsApp service loaded successfully');
+} catch (err) {
+  console.warn('WhatsApp service failed to load:', err.message);
+}
+
+// Database connection
+const dbConfig = {
+  host: 'localhost',
+  user: 'thoughtfirst',
+  password: 'Q4Mz2s7Y[bAs777',
+  database: 'thoughtfirst'
+};
+
+let db;
+try {
+  db = mysql.createPool(dbConfig);
+  console.log('Database connected successfully');
+} catch (err) {
+  console.error('Database connection failed:', err.message);
+  process.exit(1);
+}
+
+// Auth routes (always registered first)
+app.use('/api/auth', require('./routes/auth'));
+
+// Conditionally register service routes
+if (briefingService) {
+  app.use('/api/briefing', require('./routes/briefing'));
+} else {
+  app.use('/api/briefing', (req, res) => {
+    res.status(503).json({ error: 'Briefing service temporarily unavailable' });
+  });
+}
+
+if (aiService) {
+  app.use('/api/ai', require('./routes/ai'));
+} else {
+  app.use('/api/ai', (req, res) => {
+    res.status(503).json({ error: 'AI service temporarily unavailable' });
+  });
+}
+
+if (whatsappService) {
+  app.use('/api/whatsapp', require('./routes/whatsapp'));
+} else {
+  app.use('/api/whatsapp', (req, res) => {
+    res.status(503).json({ error: 'WhatsApp service temporarily unavailable' });
+  });
+}
+
+// Health check endpoint (always available)
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+// Start server
+const PORT = process.env.PORT || 3002;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});

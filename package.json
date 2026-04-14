@@ -1,0 +1,23 @@
+{
+  "name": "pos-v1",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Political Operating System v1 - NETHRA Platform",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "deploy:production": "./scripts/deploy/production.sh",
+    "backup:db": "./scripts/backup/database.sh"
+  },
+  "devDependencies": {
+    "turbo": "latest"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "author": "ThoughtFirst",
+  "license": "PROPRIETARY"
+}
