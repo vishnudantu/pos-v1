@@ -17,6 +17,15 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: 'dist',
       emptyOutDir: true,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'mantine-core': ['@mantine/core'],
+            'framer-motion': ['framer-motion'],
+            'nivo-charts': ['@nivo/core', '@nivo/line', '@nivo/bar', '@nivo/pie'],
+          },
+        },
+      },
     },
     define: {
       'import.meta.env.VITE_API_URL': JSON.stringify(apiUrl),

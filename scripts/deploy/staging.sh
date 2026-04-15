@@ -19,7 +19,7 @@ npm run build
 echo "📦 Deploying to staging..."
 STAGING_DIR="/var/www/thoughtfirst-staging"
 mkdir -p ${STAGING_DIR}
-cp -r /root/pos-v1/dist/* ${STAGING_DIR}/
+cp -r /root/pos-v1/apps/web/dist/* ${STAGING_DIR}/
 
 # Set permissions
 chown -R www-data:www-data ${STAGING_DIR}

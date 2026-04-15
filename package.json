@@ -3,7 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "description": "Political Operating System v1 - NETHRA Platform",
-  "workspaces": ["apps/*", "packages/*"],
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
@@ -19,5 +22,6 @@
     "node": ">=20.0.0"
   },
   "author": "ThoughtFirst",
-  "license": "PROPRIETARY"
+  "license": "PROPRIETARY",
+  "packageManager": "npm@10.2.4"
 }
