@@ -2,7 +2,7 @@ import { ThemeProvider } from './theme/ThemeProvider';
 import { Notifications } from '@mantine/notifications';
 import { AuthProvider } from './lib/auth';
 import { I18nProvider } from './lib/i18n';
-import MainLayout from './components/layout/MainLayout';
+import Layout from './components/layout/Layout';
 import './styles/globals.css';
 
 function App() {
@@ -11,7 +11,7 @@ function App() {
       <AuthProvider>
         <I18nProvider>
           <Notifications position="top-right" />
-          <MainLayout />
+          <Layout />
         </I18nProvider>
       </AuthProvider>
     </ThemeProvider>
