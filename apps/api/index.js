@@ -69,7 +69,7 @@ let warRoomMetrics = async () => ({});
   if (wr) { warRoomMetrics = wr.warRoomMetrics || warRoomMetrics; }
   console.log('[services] All loaded successfully');
 })();
-import darshanRoutes from './routes/darshan.js';
+import darshanRoutes from './routes/darshan.js';\nimport founderRoutes from './routes/founder.js';
 import {
   listApiKeys,
   upsertApiKey,
@@ -754,7 +754,7 @@ app.use('/api/darshan_slots',         crud('darshan_slots',          []));
 app.use('/api/darshan_quotas',        crud('darshan_quotas',         []));
 app.use('/api/darshan_waiting_list',  crud('darshan_waiting_list',   ['pilgrim_name','status']));
 app.use('/api/darshan_requests',      crud('darshan_requests',       ['pilgrim_name','status']));
-app.use('/api/darshan',               darshanRoutes);
+app.use('/api/darshan',               darshanRoutes);\napp.use('/api/founder-v2',              founderRoutes);
 app.use('/api/predictive_alerts',     crud('predictive_alerts',      ['alert_type','description','status']));
 app.use('/api/agent_tasks',           crud('agent_tasks',            ['agent_type','task_type','status']));
 app.use('/api/deepfake_incidents',    crud('deepfake_incidents',     ['platform','status','content_url']));
