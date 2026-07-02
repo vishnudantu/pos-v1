@@ -821,63 +821,6 @@ export default function SuperAdmin({ onNavigate }: { onNavigate?: (page: string)
 
   return (
     <div className="space-y-0">
-      {/* ── COMMAND HEADER ── */}
-      <div style={{ padding: '24px 0 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', marginBottom: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-              <div style={{ width: 4, height: 28, borderRadius: 2, background: 'linear-gradient(180deg,#00d4aa,#1e88e5)' }} />
-              <h1 style={{ fontSize: 22, fontWeight: 800, color: '#f0f4ff', fontFamily: 'Space Grotesk, sans-serif', letterSpacing: -0.5, margin: 0 }}>
-                Platform Command
-              </h1>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: isMob(w) ? 8 : 16, paddingLeft: 14, flexWrap: 'wrap' }}>
-              {!isMob(w) && <span style={{ fontSize: 12, color: '#8899bb' }}>
-                {new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
-              </span>}
-              {!isMob(w) && <span style={{ width: 3, height: 3, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'inline-block' }} />}
-              <span style={{ fontSize: 12, color: stats.critical > 0 ? '#ff7777' : '#00c864', fontWeight: 700 }}>
-                {stats.critical > 0 ? `${stats.critical} Critical` : '● All Systems Stable'}
-              </span>
-              <span style={{ width: 3, height: 3, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'inline-block' }} />
-              <span style={{ fontSize: 12, color: '#8899bb' }}>{stats.total} Politicians</span>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: isMob(w) ? 'flex-start' : 'flex-end' }}>
-            <button onClick={() => handleNavigate('website-admin')}
-              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#d0d8ee', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-              <LayoutDashboard size={13} /> Website CMS
-            </button>
-            <button onClick={() => { setFounderError(''); setShowFounderProfile(true); }}
-              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#d0d8ee', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-              <Settings2 size={13} /> Founder Profile
-            </button>
-            <button onClick={() => { setShowDeploy(true); setDeployError(''); setDeploySuccess(''); }}
-              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 18px', borderRadius: 10, background: 'linear-gradient(135deg,#00d4aa,#1e88e5)', color: '#060b18', fontSize: 12, fontWeight: 800, cursor: 'pointer', border: 'none' }}>
-              <Plus size={14} /> Deploy Politician
-            </button>
-          </div>
-        </div>
-
-        {/* ── PULSE METRICS ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isMob(w) ? 2 : w < 900 ? 3 : 6}, 1fr)`, gap: isMob(w) ? 8 : 12, marginTop: 20 }}>
-          {[
-            { label: 'Politicians', value: stats.total, sub: `${stats.live} live`, accent: '#00d4aa', bar: (stats.live/Math.max(stats.total,1))*100 },
-            { label: 'Performance', value: `${stats.avgPerf}`, sub: 'avg score', accent: '#42a5f5', bar: stats.avgPerf },
-            { label: 'Winning Index', value: `${stats.avgWinning}`, sub: 'platform avg', accent: '#ab47bc', bar: stats.avgWinning },
-            { label: 'Grievances', value: stats.openGrievances, sub: 'open cases', accent: stats.openGrievances > 10 ? '#ff7777' : '#ffa726', bar: Math.min(stats.openGrievances*5, 100) },
-            { label: 'Briefings', value: founderMetrics?.recent_briefings ?? 0, sub: 'generated', accent: '#26c6da', bar: 70 },
-            { label: 'Threats', value: stats.highThreats, sub: 'high priority', accent: stats.highThreats > 0 ? '#ff5555' : '#00c864', bar: Math.min(stats.highThreats*20, 100) },
-          ].map(m => (
-            <div key={m.label} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '12px 14px', position: 'relative', overflow: 'hidden' }}>
-              <div style={{ position: 'absolute', bottom: 0, left: 0, height: 2, width: `${m.bar}%`, background: m.accent, borderRadius: '0 1px 0 0', transition: 'width 0.6s ease' }} />
-              <div style={{ fontSize: 10, color: '#8899bb', textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 700, marginBottom: 6 }}>{m.label}</div>
-              <div style={{ fontSize: isMob(w) ? 18 : 24, fontWeight: 900, color: m.accent, fontFamily: 'Space Grotesk', lineHeight: 1 }}>{m.value}</div>
-              <div style={{ fontSize: 10, color: '#8899bb', marginTop: 4 }}>{m.sub}</div>
-            </div>
-          ))}
-        </div>
-      </div>
 
       {deploySuccess && (
         <motion.div
