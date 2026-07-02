@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import FounderGrievances from './FounderGrievances';
 import {
   Activity, AlertTriangle, Award, BarChart3, Briefcase,
   Calendar, Cpu, Globe, LayoutDashboard, MapPin,
-  Megaphone, RefreshCw, Shield, TrendingUp, Users, Zap
+  Megaphone, Shield, TrendingUp, Users, Zap
 } from 'lucide-react';
 
 type DashboardData = {
@@ -103,51 +103,28 @@ function healthColor(health: string) {
   return '#00c864';
 }
 
-export default function FounderDashboard({ onPoliticianClick }: { onPoliticianClick?: (id: number) => void }) {
+export default function FounderDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [tab, setTab] = useState<'overview' | 'performers' | 'risk' | 'activity' | 'map' | 'grievances'>('overview');
-  const [grievanceData, setGrievanceData] = useState<any>(null);
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const w = useWindowWidth();
   const isMob = w < 640;
 
-  const fetchData = useCallback(async () => {
-    setIsRefreshing(true);
-    if (!data) setLoading(true);
-    try {
-      const res = await api.get('/api/founder-v2/dashboard');
-      setData(res as DashboardData);
-      setLastUpdated(new Date());
-      setError('');
-    } catch (e: any) {
-      setError(e?.message || 'Failed to load dashboard');
-    }
-    setIsRefreshing(false);
-    setLoading(false);
-  }, [data]);
-
   useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 30000);
-    return () => clearInterval(interval);
-  }, [fetchData]);
-
-  useEffect(() => {
-    async function loadGrievances() {
-      if (tab !== 'grievances') return;
+    async function fetchData() {
+      setLoading(true);
       try {
-        const res = await api.get('/api/founder-v2/grievances');
-        setGrievanceData(res);
-      } catch (e) {
-        console.error('Grievances load failed', e);
+        const res = await api.get('/api/founder-v2/dashboard');
+        setData(res as DashboardData);
+      } catch (e: any) {
+        setError(e?.message || 'Failed to load dashboard');
       }
+      setLoading(false);
     }
-    loadGrievances();
-  }, [tab]);
+    fetchData();
+  }, []);
 
   const filteredPoliticians = useMemo(() => {
     if (!data) return [];
@@ -177,26 +154,6 @@ export default function FounderDashboard({ onPoliticianClick }: { onPoliticianCl
   }
 
   if (!data) return null;
-
-      {/* LIVE STATUS BAR */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', background: 'rgba(0,200,100,0.12)', border: '1px solid rgba(0,200,100,0.25)', borderRadius: 20 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#00c864', animation: 'pulse 2s infinite' }} />
-            <span style={{ fontSize: 11, fontWeight: 800, color: '#00c864', textTransform: 'uppercase', letterSpacing: 0.8 }}>Live</span>
-          </div>
-          <span style={{ fontSize: 11, color: '#8899bb' }}>
-            Updated {formatTimeAgo(lastUpdated.toISOString())}
-          </span>
-        </div>
-        <button
-          onClick={fetchData}
-          disabled={isRefreshing}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#d0d8ee', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
-        >
-          <RefreshCw size={13} style={{ animation: isRefreshing ? 'spin 1s linear infinite' : 'none' }} /> Refresh
-        </button>
-      </div>
 
   const m = data.metrics;
 
@@ -260,7 +217,6 @@ export default function FounderDashboard({ onPoliticianClick }: { onPoliticianCl
           { key: 'activity', label: 'Activity Feed', icon: Activity },
           { key: 'map', label: 'State Map', icon: Globe },
           { key: 'grievances', label: 'Grievances', icon: Megaphone },
-          { key: 'grievances', label: 'Grievances', icon: Megaphone },
         ].map(t => {
           const Icon = t.icon;
           const active = tab === t.key;
@@ -297,7 +253,7 @@ export default function FounderDashboard({ onPoliticianClick }: { onPoliticianCl
           <div style={{ fontSize: 14, fontWeight: 700, color: '#f0f4ff', marginBottom: -8 }}>All Politicians</div>
           <div style={{ display: 'grid', gridTemplateColumns: isMob ? '1fr' : 'repeat(2, 1fr)', gap: 12 }}>
             {filteredPoliticians.map(p => (
-              <PoliticianCard key={p.id} p={p} onClick={() => onPoliticianClick?.(p.id)} />
+              <PoliticianCard key={p.id} p={p} />
             ))}
           </div>
         </>
@@ -362,82 +318,14 @@ export default function FounderDashboard({ onPoliticianClick }: { onPoliticianCl
             ))}
           </div>
         </div>
-      {tab === 'grievances' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {!grievanceData ? (
-            <div style={{ padding: 40, textAlign: 'center', color: '#8899bb' }}>Loading grievance command center...</div>
-          ) : (
-            <>
-              <div style={{ display: 'grid', gridTemplateColumns: isMob ? '1fr' : 'repeat(4, 1fr)', gap: 12 }}>
-                <SummaryBox label="Total Open" value={grievanceData.total_open} color="#ffa726" />
-                <SummaryBox label="SLA Breaches" value={grievanceData.total_sla_breaches} color={grievanceData.total_sla_breaches ? '#ff5555' : '#00c864'} />
-                <SummaryBox label="Categories" value={grievanceData.category_summary?.length || 0} color="#42a5f5" />
-                <SummaryBox label="Districts Affected" value={grievanceData.district_heatmap?.length || 0} color="#ab47bc" />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: isMob ? '1fr' : '1fr 1fr', gap: 16 }}>
-                <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: 16 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#f0f4ff', marginBottom: 12 }}>By Category</div>
-                  {(grievanceData.category_summary || []).map((c: any) => (
-                    <div key={c.category} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                      <span style={{ fontSize: 12, color: '#8899bb' }}>{c.category || 'Uncategorized'}</span>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: c.open_count > 0 ? '#ffa726' : '#00c864' }}>{c.open_count || 0} open / {c.count} total</span>
-                    </div>
-                  ))}
-                </div>
-
-                <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: 16 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#f0f4ff', marginBottom: 12 }}>District Heatmap</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 8 }}>
-                    {(grievanceData.district_heatmap || []).slice(0, 12).map((d: any) => (
-                      <div key={d.district} style={{ background: d.open_count > 5 ? 'rgba(255,85,85,0.12)' : d.open_count > 0 ? 'rgba(255,167,38,0.12)' : 'rgba(0,200,100,0.12)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: 10, textAlign: 'center' }}>
-                        <div style={{ fontSize: 11, color: '#8899bb' }}>{d.district}</div>
-                        <div style={{ fontSize: 18, fontWeight: 900, color: d.open_count > 0 ? '#ff7777' : '#00c864' }}>{d.open_count}</div>
-                        <div style={{ fontSize: 10, color: '#8899bb' }}>{d.total} total</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {grievanceData.sla_breaches?.length > 0 && (
-                <div style={{ background: 'rgba(255,85,85,0.08)', border: '1px solid rgba(255,85,85,0.2)', borderRadius: 12, padding: 16 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#ff7777', marginBottom: 12 }}>⚠ SLA Breaches (>14 days)</div>
-                  {grievanceData.sla_breaches.map((g: any) => (
-                    <div key={g.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,85,85,0.1)' }}>
-                      <div>
-                        <div style={{ fontSize: 12, color: '#f0f4ff', fontWeight: 700 }}>{g.subject || 'Untitled grievance'}</div>
-                        <div style={{ fontSize: 11, color: '#ffaaaa' }}>{g.politician_name} · {g.district} · {g.days_open} days open</div>
-                      </div>
-                      <span style={{ padding: '3px 8px', borderRadius: 6, background: 'rgba(255,85,85,0.2)', color: '#ff7777', fontSize: 10, fontWeight: 800 }}>{g.status}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: 16 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#f0f4ff', marginBottom: 12 }}>Top Unresolved Grievances</div>
-                {(grievanceData.top_unresolved || []).map((g: any) => (
-                  <div key={g.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div>
-                      <div style={{ fontSize: 12, color: '#f0f4ff', fontWeight: 700 }}>{g.subject || 'Untitled grievance'}</div>
-                      <div style={{ fontSize: 11, color: '#8899bb' }}>{g.politician_name} · {g.district} · {g.category || 'No category'} · {g.days_open} days</div>
-                    </div>
-                    <span style={{ padding: '3px 8px', borderRadius: 6, background: g.priority === 'High' ? 'rgba(255,85,85,0.15)' : 'rgba(255,167,38,0.12)', color: g.priority === 'High' ? '#ff7777' : '#ffa726', fontSize: 10, fontWeight: 800 }}>{g.priority}</span>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
       )}
     </div>
   );
 }
 
-function PoliticianCard({ p, onClick }: { p: PoliticianHealth; onClick?: () => void }) {
+function PoliticianCard({ p }: { p: PoliticianHealth }) {
   return (
-    <div onClick={onClick} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 16, position: 'relative', overflow: 'hidden', cursor: onClick ? 'pointer' : 'default', transition: 'all 0.2s ease' }} onMouseEnter={(e) => onClick && (e.currentTarget.style.borderColor = 'rgba(0,212,170,0.3)')} onMouseLeave={(e) => onClick && (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}>
+    <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 16, position: 'relative', overflow: 'hidden' }}>
       <div style={{ position: 'absolute', top: 0, left: 0, width: 4, height: '100%', background: healthColor(p.health) }} />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
         <div>
@@ -462,14 +350,11 @@ function PoliticianCard({ p, onClick }: { p: PoliticianHealth; onClick?: () => v
           </div>
         ))}
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 }}>
-        <div style={{ display: 'flex', gap: 12, fontSize: 11, color: '#8899bb' }}>
+      <div style={{ display: 'flex', gap: 12, fontSize: 11, color: '#8899bb' }}>
         <span>⚠ {p.open_grievances} grievances</span>
         <span>📁 {p.active_projects} projects</span>
         <span>📅 {p.upcoming_events} events</span>
         <span>👁 {p.negative_mentions_30d} neg media</span>
-        </div>
-        {onClick && <button onClick={(e) => { e.stopPropagation(); onClick(); }} style={{ fontSize: 11, color: '#00d4aa', fontWeight: 700, background: 'transparent', border: 'none', cursor: 'pointer' }}>View Profile →</button>}
       </div>
     </div>
   );
@@ -521,13 +406,4 @@ function activityColor(type: string) {
   if (type === 'media') return '#26c6da';
   if (type === 'opposition') return '#ff5555';
   return '#00d4aa';
-}
-
-function SummaryBox({ label, value, color }: { label: string; value: number; color: string }) {
-  return (
-    <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: 16 }}>
-      <div style={{ fontSize: 24, fontWeight: 900, color }}>{value}</div>
-      <div style={{ fontSize: 11, color: '#8899bb', marginTop: 4, textTransform: 'uppercase', letterSpacing: 0.6 }}>{label}</div>
-    </div>
-  );
 }
