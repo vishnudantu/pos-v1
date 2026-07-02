@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { api } from '../lib/api';
 import {
   Activity, AlertTriangle, Award, BarChart3, Briefcase,
   Calendar, Cpu, Globe, LayoutDashboard, MapPin,
-  Megaphone, Shield, TrendingUp, Users, Zap
+  Megaphone, RefreshCw, Shield, TrendingUp, Users, Zap
 } from 'lucide-react';
 
 type DashboardData = {
@@ -108,22 +108,31 @@ export default function FounderDashboard() {
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [tab, setTab] = useState<'overview' | 'performers' | 'risk' | 'activity' | 'map'>('overview');
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const w = useWindowWidth();
   const isMob = w < 640;
 
-  useEffect(() => {
-    async function fetchData() {
-      setLoading(true);
-      try {
-        const res = await api.get('/api/founder-v2/dashboard');
-        setData(res as DashboardData);
-      } catch (e: any) {
-        setError(e?.message || 'Failed to load dashboard');
-      }
-      setLoading(false);
+  const fetchData = useCallback(async () => {
+    setIsRefreshing(true);
+    if (!data) setLoading(true);
+    try {
+      const res = await api.get('/api/founder-v2/dashboard');
+      setData(res as DashboardData);
+      setLastUpdated(new Date());
+      setError('');
+    } catch (e: any) {
+      setError(e?.message || 'Failed to load dashboard');
     }
+    setIsRefreshing(false);
+    setLoading(false);
+  }, [data]);
+
+  useEffect(() => {
     fetchData();
-  }, []);
+    const interval = setInterval(fetchData, 30000);
+    return () => clearInterval(interval);
+  }, [fetchData]);
 
   const filteredPoliticians = useMemo(() => {
     if (!data) return [];
@@ -153,6 +162,26 @@ export default function FounderDashboard() {
   }
 
   if (!data) return null;
+
+      {/* LIVE STATUS BAR */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', background: 'rgba(0,200,100,0.12)', border: '1px solid rgba(0,200,100,0.25)', borderRadius: 20 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#00c864', animation: 'pulse 2s infinite' }} />
+            <span style={{ fontSize: 11, fontWeight: 800, color: '#00c864', textTransform: 'uppercase', letterSpacing: 0.8 }}>Live</span>
+          </div>
+          <span style={{ fontSize: 11, color: '#8899bb' }}>
+            Updated {formatTimeAgo(lastUpdated.toISOString())}
+          </span>
+        </div>
+        <button
+          onClick={fetchData}
+          disabled={isRefreshing}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#d0d8ee', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+        >
+          <RefreshCw size={13} style={{ animation: isRefreshing ? 'spin 1s linear infinite' : 'none' }} /> Refresh
+        </button>
+      </div>
 
   const m = data.metrics;
 
