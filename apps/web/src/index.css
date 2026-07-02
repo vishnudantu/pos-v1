@@ -146,3 +146,66 @@ body {
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* ── GLOBAL DARK FORM INPUTS ── */
+input,
+textarea,
+select,
+input[type="date"],
+input[type="datetime-local"],
+input[type="email"],
+input[type="month"],
+input[type="number"],
+input[type="password"],
+input[type="search"],
+input[type="tel"],
+input[type="text"],
+input[type="time"],
+input[type="url"],
+input[type="week"] {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  color: #f0f4ff !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 10px !important;
+  padding: 10px 14px !important;
+  font-size: 14px !important;
+  outline: none !important;
+  transition: all 0.15s ease !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #8899bb !important;
+  opacity: 1 !important;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: #00d4aa !important;
+  background-color: rgba(255, 255, 255, 0.09) !important;
+  box-shadow: 0 0 0 2px rgba(0, 212, 170, 0.15) !important;
+}
+
+input:disabled,
+textarea:disabled,
+select:disabled {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+  color: #8899bb !important;
+  cursor: not-allowed !important;
+}
+
+/* Date/calendar icon inversion for dark mode */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="month"]::-webkit-calendar-picker-indicator,
+input[type="week"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(1.2);
+  cursor: pointer;
+}
+
+select option {
+  background-color: #0f1623;
+  color: #f0f4ff;
+}
