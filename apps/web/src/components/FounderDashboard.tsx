@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import api from '../lib/api';
+import { api } from '../lib/api';
 import {
   Activity, AlertTriangle, Award, BarChart3, Briefcase,
   Calendar, Cpu, Globe, LayoutDashboard, MapPin,

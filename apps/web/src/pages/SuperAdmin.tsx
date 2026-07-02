@@ -954,7 +954,11 @@ export default function SuperAdmin({ onNavigate }: { onNavigate?: (page: string)
             <div className="w-8 h-8 rounded-full border-2 animate-spin mx-auto mb-3" style={{ borderColor: 'rgba(0,212,170,0.2)', borderTopColor: '#00d4aa' }} />
             Loading...
           </div>
-        ) : tab === 'overview' ? (\n          <div className=\"p-5\">\n            <FounderDashboard />\n          </div>\n        ) : tab === 'access' ? (
+        ) : tab === 'overview' ? (
+          <div className="p-5">
+            <FounderDashboard />
+          </div>
+        ) : tab === 'access' ? (
 
           <div className="p-5 space-y-6">
             <div className="flex items-center justify-between flex-wrap gap-3">
