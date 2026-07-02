@@ -1337,19 +1337,43 @@ const requireSuperAdmin = (req, res) => {
 app.get('/api/founder/dashboard', authMiddleware, async (req, res) => {
   if (!requireSuperAdmin(req, res)) return;
   try {
-    const [[{ totalPoliticians }]] = await pool.query("SELECT COUNT(*) as totalPoliticians FROM politician_profiles WHERE is_active = 1 AND (role = 'politician' OR role IS NULL)");
-    const [[{ totalUsers }]] = await pool.query('SELECT COUNT(*) as totalUsers FROM users WHERE is_active = 1');
-    const [[{ openAlerts }]] = await pool.query('SELECT COUNT(*) as openAlerts FROM notifications WHERE is_read = 0');
-    const [[{ activeBriefings }]] = await pool.query('SELECT COUNT(*) as activeBriefings FROM ai_briefings WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)');
-    const [politicians] = await pool.query("SELECT id,full_name,party,designation,state,is_active,created_at FROM politician_profiles WHERE (role = 'politician' OR role IS NULL) AND role != 'admin' ORDER BY created_at DESC LIMIT 12");
-    const [intelFeed] = await pool.query('SELECT id,opponent_name,activity_type,description,created_at FROM opposition_intelligence ORDER BY created_at DESC LIMIT 10');
+    const [[{ total_politicians }]] = await pool.query("SELECT COUNT(*) as total_politicians FROM politician_profiles WHERE is_active = 1 AND (role = 'politician' OR role IS NULL)");
+    const [[{ total_mps }]] = await pool.query("SELECT COUNT(*) as total_mps FROM politician_profiles WHERE designation LIKE '%Lok Sabha%' AND is_active = 1");
+    const [[{ total_mlas }]] = await pool.query("SELECT COUNT(*) as total_mlas FROM politician_profiles WHERE designation LIKE '%Legislative Assembly%' AND is_active = 1");
+    const [[{ total_users }]] = await pool.query('SELECT COUNT(*) as total_users FROM users WHERE is_active = 1');
+    const [[{ open_grievances }]] = await pool.query("SELECT COUNT(*) as open_grievances FROM grievances WHERE status NOT IN ('Resolved','Closed')");
+    const [[{ active_projects }]] = await pool.query("SELECT COUNT(*) as active_projects FROM projects WHERE status IN ('In Progress','Planning','Tendering')");
+    const [[{ upcoming_events }]] = await pool.query("SELECT COUNT(*) as upcoming_events FROM events WHERE start_date >= NOW()");
+    const [[{ recent_briefings }]] = await pool.query('SELECT COUNT(*) as recent_briefings FROM ai_briefings WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)');
+    const [[{ total_media }]] = await pool.query('SELECT COUNT(*) as total_media FROM media_mentions');
+    const [[{ negative_mentions_24h }]] = await pool.query("SELECT COUNT(*) as negative_mentions_24h FROM media_mentions WHERE sentiment = 'negative' AND published_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)");
+    const [[{ avg_sentiment }]] = await pool.query('SELECT ROUND(AVG(overall_score)) as avg_sentiment FROM sentiment_scores WHERE score_date >= DATE_SUB(CURDATE(), INTERVAL 14 DAY)');
+    const [[{ high_threats }]] = await pool.query('SELECT COUNT(*) as high_threats FROM opposition_intelligence WHERE threat_level >= 7 AND detected_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)');
+    const [[{ open_alerts }]] = await pool.query('SELECT COUNT(*) as open_alerts FROM notifications WHERE is_read = 0');
     const [[{ mrr }]] = await pool.query("SELECT COALESCE(SUM(amount),0) as mrr FROM billing_records WHERE status = 'paid' AND billing_period = 'monthly'");
+    const [politicians] = await pool.query("SELECT id,full_name,display_name,photo_url,party,designation,constituency_name,state,is_active,created_at FROM politician_profiles WHERE (role = 'politician' OR role IS NULL) AND role != 'admin' ORDER BY full_name LIMIT 12");
+    const [intelFeed] = await pool.query('SELECT id,opponent_name,party,activity_type,description,threat_level,created_at FROM opposition_intelligence ORDER BY created_at DESC LIMIT 10');
     res.json({
-      metrics: { total_politicians: totalPoliticians, total_users: totalUsers, open_alerts: openAlerts, recent_briefings: activeBriefings, mrr },
+      metrics: {
+        total_politicians,
+        total_mps,
+        total_mlas,
+        total_users,
+        open_grievances,
+        active_projects,
+        upcoming_events,
+        recent_briefings,
+        total_media_mentions: total_media,
+        negative_mentions_24h,
+        avg_sentiment: avg_sentiment || 0,
+        high_threats,
+        open_alerts,
+        mrr
+      },
       politicians,
       intelligence_feed: intelFeed,
     });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('[founder/dashboard]', e.message); res.status(500).json({ error: e.message }); }
 });
 
 app.get('/api/founder/platform/metrics', authMiddleware, async (req, res) => {

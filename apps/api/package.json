@@ -13,5 +13,21 @@
     "node": ">=20.0.0"
   },
   "author": "ThoughtFirst",
-  "license": "PROPRIETARY"
+  "license": "PROPRIETARY",
+  "dependencies": {
+    "axios": "^1.18.1",
+    "bcryptjs": "^2.4.3",
+    "bull": "^4.16.5",
+    "cheerio": "^1.2.0",
+    "cors": "^2.8.6",
+    "crypto": "^1.0.1",
+    "dotenv": "^16.6.1",
+    "express": "^4.22.2",
+    "ioredis": "^5.11.1",
+    "jsonwebtoken": "^9.0.3",
+    "mysql2": "^3.22.5",
+    "nodemailer": "^6.10.1",
+    "puppeteer": "^24.43.1",
+    "rss-parser": "^3.13.0"
+  }
 }

@@ -10,6 +10,7 @@ import AITrainingTab from '../components/AITrainingTab';
 import { useAuth } from '../lib/auth';
 import Badge from '../components/ui/Badge';
 import PhotoUpload from '../components/PhotoUpload';
+import FounderDashboard from '../components/FounderDashboard';
 ;
 import type { AdminReport, FeatureAccess, FeatureFlag, FeatureModule, ModuleAccess } from '../lib/types';
 
@@ -953,148 +954,7 @@ export default function SuperAdmin({ onNavigate }: { onNavigate?: (page: string)
             <div className="w-8 h-8 rounded-full border-2 animate-spin mx-auto mb-3" style={{ borderColor: 'rgba(0,212,170,0.2)', borderTopColor: '#00d4aa' }} />
             Loading...
           </div>
-        ) : tab === 'overview' ? (
-          <div style={{ padding: '20px 20px 24px' }}>
-
-            {/* ── SECTION HEADER ── */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#f0f4ff', letterSpacing: 0.2 }}>All Politicians</div>
-                <div style={{ fontSize: 11, color: '#8899bb', marginTop: 2 }}>{filteredOverview.length} accounts · sorted by performance</div>
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => { setTab('reports'); setReportPoliticianId(''); }}
-                  style={{ display:'flex',alignItems:'center',gap:6,padding:'7px 13px',borderRadius:9,background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.09)',color:'#aabbd0',fontSize:11,fontWeight:600,cursor:'pointer' }}>
-                  <FileBarChart2 size={12} /> Reports
-                </button>
-                <button onClick={() => { setTab('access'); }}
-                  style={{ display:'flex',alignItems:'center',gap:6,padding:'7px 13px',borderRadius:9,background:'rgba(0,212,170,0.1)',border:'1px solid rgba(0,212,170,0.25)',color:'#00d4aa',fontSize:11,fontWeight:600,cursor:'pointer' }}>
-                  <Settings2 size={12} /> Manage Access
-                </button>
-              </div>
-            </div>
-
-            {/* ── REGION GROUPING ── */}
-            {(() => {
-              const regions: Record<string, typeof filteredOverview> = {};
-              filteredOverview.forEach(p => {
-                const r = p.state || 'Other';
-                if (!regions[r]) regions[r] = [];
-                regions[r].push(p);
-              });
-              return Object.entries(regions).map(([region, pols]) => (
-                <div key={region} style={{ marginBottom: 24 }}>
-                  <div style={{ fontSize: 10, fontWeight: 800, color: '#8899bb', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 12, paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    {region} · {pols.length} politician{pols.length !== 1 ? 's' : ''}
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: isMob(w) ? '1fr' : w < 900 ? '1fr' : 'repeat(auto-fill,minmax(300px,1fr))', gap: 10 }}>
-                    {pols.map(p => {
-                      const perf = p.performance ?? 0;
-                      const perfColor = perf >= 70 ? '#00d4aa' : perf >= 40 ? '#ffa726' : '#ff5555';
-                      const initials = p.full_name.split(' ').map((n:string)=>n[0]).slice(0,2).join('').toUpperCase();
-                      const accentColor = p.color_primary || '#00d4aa';
-                      return (
-                        <div key={p.id}
-                          style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: '14px 16px', position: 'relative', overflow: 'hidden', cursor: 'default' }}
-                          onMouseEnter={e => (e.currentTarget.style.background='rgba(255,255,255,0.05)')}
-                          onMouseLeave={e => (e.currentTarget.style.background='rgba(255,255,255,0.025)')}
-                        >
-                          <div style={{ position:'absolute',left:0,top:0,bottom:0,width:3,background:accentColor,borderRadius:'14px 0 0 14px',opacity:0.7 }} />
-
-                          <div style={{ paddingLeft: 8 }}>
-                            {/* Name row */}
-                            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
-                              <PhotoUpload
-                                politicianId={p.id}
-                                currentPhotoUrl={(p as any).photo_url || null}
-                                politicianName={p.full_name}
-                                size="sm"
-                                onPhotoUpdated={(url) => {
-                                  setOverview(prev => prev.map(x => x.id === p.id ? { ...x, photo_url: url } as any : x));
-                                }}
-                              />
-                              <div style={{ flex:1, minWidth:0 }}>
-                                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:4 }}>
-                                  <div style={{ fontSize:isMob(w) ? 13 : 12, fontWeight:700, color:'#f0f4ff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace: isMob(w) ? 'normal' : 'nowrap', lineHeight: 1.3 }}>{p.full_name}</div>
-                                  <div style={{ width:6, height:6, borderRadius:'50%', background: p.is_active ? '#00c864' : '#666', flexShrink:0 }} />
-                                </div>
-                                <div style={{ fontSize:10, color:'#8899bb', marginTop:1 }}>{p.designation} · {p.constituency_name}</div>
-                              </div>
-                            </div>
-
-                            {/* Election metrics grid */}
-                            {(() => {
-                              const margin = (p as any).winning_margin;
-                              const votes = (p as any).vote_count;
-                              const polled = (p as any).total_votes_polled;
-                              const voteShare = (votes && polled) ? Math.round(votes * 100 / polled) : null;
-                              const marginPct = (margin && polled) ? (margin * 100 / polled).toFixed(1) : null;
-                              const fmtNum = (n: number) => n >= 100000 ? `${(n/100000).toFixed(1)}L` : n >= 1000 ? `${(n/1000).toFixed(0)}K` : `${n}`;
-                              return (
-                                <div style={{ display:'grid', gridTemplateColumns:`repeat(${isMob(w) ? 2 : 3},1fr)`, gap:6, marginBottom:10 }}>
-                                  <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'6px 8px' }}>
-                                    <div style={{ fontSize:9, color:'#8899bb', textTransform:'uppercase', letterSpacing:0.5, marginBottom:2 }}>Margin</div>
-                                    <div style={{ fontSize:13, fontWeight:800, color: margin > 50000 ? '#00d4aa' : margin > 20000 ? '#ffa726' : '#ff7777', fontFamily:'Space Grotesk' }}>
-                                      {margin ? fmtNum(margin) : '—'}
-                                    </div>
-                                  </div>
-                                  <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'6px 8px' }}>
-                                    <div style={{ fontSize:9, color:'#8899bb', textTransform:'uppercase', letterSpacing:0.5, marginBottom:2 }}>Vote Share</div>
-                                    <div style={{ fontSize:13, fontWeight:800, color: voteShare && voteShare >= 60 ? '#00d4aa' : voteShare && voteShare >= 50 ? '#42a5f5' : '#ffa726', fontFamily:'Space Grotesk' }}>
-                                      {voteShare ? `${voteShare}%` : '—'}
-                                    </div>
-                                  </div>
-                                  <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'6px 8px' }}>
-                                    <div style={{ fontSize:9, color:'#8899bb', textTransform:'uppercase', letterSpacing:0.5, marginBottom:2 }}>Votes</div>
-                                    <div style={{ fontSize:13, fontWeight:800, color:'#d0d8ee', fontFamily:'Space Grotesk' }}>
-                                      {votes ? fmtNum(votes) : '—'}
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })()}
-
-                            {/* Platform activity bar */}
-                            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
-                              <div style={{ flex:1, height:2, borderRadius:2, background:'rgba(255,255,255,0.06)', overflow:'hidden' }}>
-                                <div style={{ height:'100%', width:`${perf}%`, background:`linear-gradient(90deg,${perfColor}66,${perfColor})`, borderRadius:2, transition:'width 0.6s ease' }} />
-                              </div>
-                              <span style={{ fontSize:9, color:'#8899bb', flexShrink:0 }}>Platform {perf}</span>
-                              {(p.open_grievances ?? 0) > 0 && (
-                                <span style={{ fontSize:9, color:'#ff7777', flexShrink:0 }}>· {p.open_grievances} pending</span>
-                              )}
-                            </div>
-
-                            {/* Actions */}
-                            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                              <button onClick={() => { setTab('access'); setSelectedAccessPolitician(p.id); }}
-                                style={{ fontSize:10, padding:'4px 10px', borderRadius:7, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', color:'#8899bb', cursor:'pointer', fontWeight:600 }}>
-                                Access
-                              </button>
-                              <button onClick={() => { setTab('reports'); setReportPoliticianId(p.id); }}
-                                style={{ fontSize:10, padding:'4px 10px', borderRadius:7, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', color:'#8899bb', cursor:'pointer', fontWeight:600 }}>
-                                Report
-                              </button>
-                              <span style={{ marginLeft:'auto', fontSize:9, padding:'3px 8px', borderRadius:6, background: p.is_active ? 'rgba(0,200,100,0.08)' : 'rgba(255,255,255,0.04)', color: p.is_active ? '#00c864' : '#666', fontWeight:700, border:`1px solid ${p.is_active ? 'rgba(0,200,100,0.15)' : 'rgba(255,255,255,0.06)'}` }}>
-                                {p.subscription_status || 'active'}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ));
-            })()}
-
-            {filteredOverview.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '60px 0', color: '#8899bb', fontSize: 13 }}>
-                No politicians found. Deploy the first one.
-              </div>
-            )}
-          </div>
-        ) : tab === 'access' ? (
+        ) : tab === 'overview' ? (\n          <div className=\"p-5\">\n            <FounderDashboard />\n          </div>\n        ) : tab === 'access' ? (
 
           <div className="p-5 space-y-6">
             <div className="flex items-center justify-between flex-wrap gap-3">
