@@ -332,8 +332,7 @@ app.post('/api/auth/login', async (req, res) => {
       }
     } catch(polErr) { console.warn('[login] politician fetch failed:', polErr.message); }
     res.json({ token, user: { id: user.id, email: user.email, role: user.role, politician_id: user.politician_id, two_factor_enabled: user.two_factor_enabled || 0, display_name: user.display_name }, politician, allPoliticians });
-  } catch (err) { console.error('[login]', err.message, err.stack?.split('
-')[1]); res.status(500).json({ error: 'Server error: ' + err.message }); }
+  } catch (err) { console.error('[login]', err.message, err.stack?.split('\n')[1]); res.status(500).json({ error: 'Server error: ' + err.message }); }
 });
 
 app.get('/api/auth/me', authMiddleware, async (req, res) => {
@@ -2139,8 +2138,7 @@ app.post('/api/admin/reports/weekly', authMiddleware, async (req, res) => {
         `• Average sentiment score: ${sentiment?.avg_score ?? 0}`,
         `• High-threat opposition activity: ${opposition?.threats || 0}`,
         `• Active projects: ${projects?.active || 0}`,
-      ].join('
-');
+      ].join('\n');
       const [result] = await pool.query(
         'INSERT INTO admin_reports (politician_id,report_type,title,summary,content,created_by) VALUES (?,?,?,?,?,?)',
         [polId, 'weekly_performance', title, summary, content, req.user.id],
@@ -2303,8 +2301,7 @@ app.post('/api/grievances/ai-triage', authMiddleware, async (req, res) => {
 Return ONLY a JSON array: [{"id":N,"urgency":N,"category":"string","action":"string","reason":"string"}]
 
 Grievances:
-${grievances.map(g => `ID:${g.id} | ${g.subject} | ${g.location} | ${(g.description||'').slice(0,80)}`).join('
-')}`;
+${grievances.map(g => `ID:${g.id} | ${g.subject} | ${g.location} | ${(g.description||'').slice(0,80)}`).join('\n')}`;
     const result = await aiJSON({ prompt, system: 'You are a political triage system. Return only valid JSON arrays. No markdown.', politicianId: polId, endpoint: 'grievance.triage', maxTokens: 1200 });
     res.json({ triage: Array.isArray(result) ? result : (result.triage || []) });
   } catch (e) { console.error('[grievance-triage]', e.message); res.status(500).json({ error: e.message }); }
@@ -2344,8 +2341,7 @@ app.post('/api/opposition/ai-analysis', authMiddleware, async (req, res) => {
     const prompt = intel.length
       ? `Analyze this opposition intelligence for ${pol?.full_name} (${pol?.party}) from ${pol?.constituency_name}:
 
-${intel.map(i => `[${i.activity_type}] ${i.opponent_name}: ${(i.description||'').slice(0,100)} (threat: ${i.threat_level}/10)`).join('
-')}
+${intel.map(i => `[${i.activity_type}] ${i.opponent_name}: ${(i.description||'').slice(0,100)} (threat: ${i.threat_level}/10)`).join('\n')}
 
 Provide:
 1. OVERALL THREAT LEVEL (1-10)
@@ -2368,8 +2364,7 @@ app.post('/api/sentiment/ai-summary', authMiddleware, async (req, res) => {
     const prompt = `Analyze constituency sentiment:
 
 SCORES (last 7 days): ${scores.map(s => `${s.score_date}: ${s.overall_score}/100`).join(', ') || 'No data yet'}
-MEDIA: ${media.map(m => `[${m.sentiment}] ${m.source}: ${m.headline}`).join('
-') || 'No recent media'}
+MEDIA: ${media.map(m => `[${m.sentiment}] ${m.source}: ${m.headline}`).join('\n') || 'No recent media'}
 
 Provide:
 1. TREND DIRECTION (improving/stable/declining)
@@ -2474,8 +2469,7 @@ app.post('/api/voice/ai-summary', authMiddleware, async (req, res) => {
     if (!reports.length) return res.json({ summary: 'No voice reports submitted yet.' });
     
     const prompt = `Summarize these field intelligence voice reports:
-${reports.map(r=>`[${r.classification}] ${r.reporter_name} from ${r.location||'unknown'}: ${(r.transcript||'').slice(0,120)}`).join('
-')}
+${reports.map(r=>`[${r.classification}] ${r.reporter_name} from ${r.location||'unknown'}: ${(r.transcript||'').slice(0,120)}`).join('\n')}
 
 Provide:
 1. TOP ISSUES REPORTED (top 3 with locations)
@@ -2498,8 +2492,7 @@ app.post('/api/projects/ai-risk', authMiddleware, async (req, res) => {
 {"high_risk":[{"name":"...","risk":"...","action":"..."}],"on_track":["name1"],"completion_forecast":"string","budget_alert":"string or null"}
 
 Projects:
-${projects.map(p=>`${p.project_name}: ${p.status}, ${p.progress_percent||0}% done, due:${p.expected_completion||'TBD'}`).join('
-')}`;
+${projects.map(p=>`${p.project_name}: ${p.status}, ${p.progress_percent||0}% done, due:${p.expected_completion||'TBD'}`).join('\n')}`;
     const result = await aiJSON({ prompt, system: 'You analyze constituency project risks. Return only valid JSON.', politicianId: polId, endpoint: 'projects.risk', maxTokens: 600 });
     res.json(result);
   } catch (e) { console.error('[projects-risk]', e.message); res.status(500).json({ error: e.message }); }
@@ -2513,8 +2506,7 @@ app.post('/api/whatsapp/ai-analysis', authMiddleware, async (req, res) => {
     if (!messages.length) return res.json({ analysis: 'No WhatsApp messages in the last 24 hours.' });
     
     const prompt = `Analyze these WhatsApp messages received in the last 24 hours:
-${messages.map(m=>`[${m.classification}, urgency:${m.urgency_score}${m.is_viral?' VIRAL':''}${m.is_misinformation?' MISINFO':''}] ${(m.content||'').slice(0,100)}`).join('
-')}
+${messages.map(m=>`[${m.classification}, urgency:${m.urgency_score}${m.is_viral?' VIRAL':''}${m.is_misinformation?' MISINFO':''}] ${(m.content||'').slice(0,100)}`).join('\n')}
 
 Provide:
 1. DOMINANT CONCERN today
