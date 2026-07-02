@@ -172,3 +172,15 @@ curl -s https://api.thoughtfirst.in/api/founder/dashboard \
 
 # Database shell
 mysql -u pos_user -p pos_db
+
+### 7. Founder-v2 Command Center APIs (Added)
+Created new route file `apps/api/routes/founder.js` and mounted at `/api/founder-v2`:
+- `GET /api/founder-v2/overview` — platform-wide aggregated metrics
+- `GET /api/founder-v2/ranking` — politician performance ranking
+- `GET /api/founder-v2/audit` — paginated audit log viewer
+- `GET /api/founder-v2/health` — system + AI provider health
+- `GET /api/founder-v2/state-map` — state/district politician grouping
+- `GET /api/founder-v2/activity` — recent logins and audit activity
+- `GET /api/founder-v2/party-summary` — party-wise MP/MLA counts
+
+All endpoints require `super_admin` role.
