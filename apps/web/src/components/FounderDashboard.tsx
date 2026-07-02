@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { api } from '../lib/api';
+import FounderGrievances from './FounderGrievances';
 import {
   Activity, AlertTriangle, Award, BarChart3, Briefcase,
   Calendar, Cpu, Globe, LayoutDashboard, MapPin,
@@ -259,6 +260,7 @@ export default function FounderDashboard({ onPoliticianClick }: { onPoliticianCl
           { key: 'activity', label: 'Activity Feed', icon: Activity },
           { key: 'map', label: 'State Map', icon: Globe },
           { key: 'grievances', label: 'Grievances', icon: Megaphone },
+          { key: 'grievances', label: 'Grievances', icon: Megaphone },
         ].map(t => {
           const Icon = t.icon;
           const active = tab === t.key;
@@ -338,7 +340,7 @@ export default function FounderDashboard({ onPoliticianClick }: { onPoliticianCl
         </div>
       )}
 
-      {tab === 'map' && (
+      {tab === 'grievances' && <FounderGrievances isMob={isMob} />}\n\n      {tab === 'map' && (
         <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: 16 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: '#f0f4ff', marginBottom: 12 }}>State: {data.state_map.by_state[0]?.state}</div>
           <div style={{ display: 'grid', gridTemplateColumns: isMob ? '1fr' : 'repeat(3, 1fr)', gap: 12 }}>
