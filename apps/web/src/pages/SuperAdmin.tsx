@@ -835,6 +835,24 @@ export default function SuperAdmin({ onNavigate }: { onNavigate?: (page: string)
         </motion.div>
       )}
 
+      {/* ── FOUNDER ACTIONS ── */}
+      <div style={{ padding: '14px 0', borderBottom: '1px solid rgba(255,255,255,0.06)', marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: isMob(w) ? 'flex-start' : 'flex-end' }}>
+          <button onClick={() => handleNavigate('website-admin')}
+            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#d0d8ee', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+            <LayoutDashboard size={13} /> Website CMS
+          </button>
+          <button onClick={() => { setFounderError(''); setShowFounderProfile(true); }}
+            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#d0d8ee', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+            <Settings2 size={13} /> Founder Profile
+          </button>
+          <button onClick={() => { setShowDeploy(true); setDeployError(''); setDeploySuccess(''); }}
+            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 18px', borderRadius: 10, background: 'linear-gradient(135deg,#00d4aa,#1e88e5)', color: '#060b18', fontSize: 12, fontWeight: 800, cursor: 'pointer', border: 'none' }}>
+            <Plus size={14} /> Deploy Politician
+          </button>
+        </div>
+      </div>
+
       <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 0, padding: 4, borderBottom: '1px solid rgba(255,255,255,0.06)', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {([
