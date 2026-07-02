@@ -917,7 +917,7 @@ export default function SuperAdmin({ onNavigate }: { onNavigate?: (page: string)
           </div>
         ) : tab === 'overview' ? (
           <div className="p-5">
-            <FounderDashboard />
+            <FounderDashboard onPoliticianClick={(id) => window.location.href = `/?page=dashboard&politician_id=${id}`} />
           </div>
         ) : tab === 'access' ? (
 

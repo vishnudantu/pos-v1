@@ -102,7 +102,7 @@ function healthColor(health: string) {
   return '#00c864';
 }
 
-export default function FounderDashboard() {
+export default function FounderDashboard({ onPoliticianClick }: { onPoliticianClick?: (id: number) => void }) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -280,7 +280,7 @@ export default function FounderDashboard() {
           <div style={{ fontSize: 14, fontWeight: 700, color: '#f0f4ff', marginBottom: -8 }}>All Politicians</div>
           <div style={{ display: 'grid', gridTemplateColumns: isMob ? '1fr' : 'repeat(2, 1fr)', gap: 12 }}>
             {filteredPoliticians.map(p => (
-              <PoliticianCard key={p.id} p={p} />
+              <PoliticianCard key={p.id} p={p} onClick={() => onPoliticianClick?.(p.id)} />
             ))}
           </div>
         </>
@@ -350,9 +350,9 @@ export default function FounderDashboard() {
   );
 }
 
-function PoliticianCard({ p }: { p: PoliticianHealth }) {
+function PoliticianCard({ p, onClick }: { p: PoliticianHealth; onClick?: () => void }) {
   return (
-    <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 16, position: 'relative', overflow: 'hidden' }}>
+    <div onClick={onClick} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 16, position: 'relative', overflow: 'hidden', cursor: onClick ? 'pointer' : 'default', transition: 'all 0.2s ease' }} onMouseEnter={(e) => onClick && (e.currentTarget.style.borderColor = 'rgba(0,212,170,0.3)')} onMouseLeave={(e) => onClick && (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}>
       <div style={{ position: 'absolute', top: 0, left: 0, width: 4, height: '100%', background: healthColor(p.health) }} />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
         <div>
@@ -377,11 +377,14 @@ function PoliticianCard({ p }: { p: PoliticianHealth }) {
           </div>
         ))}
       </div>
-      <div style={{ display: 'flex', gap: 12, fontSize: 11, color: '#8899bb' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 }}>
+        <div style={{ display: 'flex', gap: 12, fontSize: 11, color: '#8899bb' }}>
         <span>⚠ {p.open_grievances} grievances</span>
         <span>📁 {p.active_projects} projects</span>
         <span>📅 {p.upcoming_events} events</span>
         <span>👁 {p.negative_mentions_30d} neg media</span>
+        </div>
+        {onClick && <button onClick={(e) => { e.stopPropagation(); onClick(); }} style={{ fontSize: 11, color: '#00d4aa', fontWeight: 700, background: 'transparent', border: 'none', cursor: 'pointer' }}>View Profile →</button>}
       </div>
     </div>
   );
