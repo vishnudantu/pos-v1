@@ -107,7 +107,8 @@ export default function FounderDashboard({ onPoliticianClick }: { onPoliticianCl
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [tab, setTab] = useState<'overview' | 'performers' | 'risk' | 'activity' | 'map'>('overview');
+  const [tab, setTab] = useState<'overview' | 'performers' | 'risk' | 'activity' | 'map' | 'grievances'>('overview');
+  const [grievanceData, setGrievanceData] = useState<any>(null);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
   const w = useWindowWidth();
@@ -133,6 +134,19 @@ export default function FounderDashboard({ onPoliticianClick }: { onPoliticianCl
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
   }, [fetchData]);
+
+  useEffect(() => {
+    async function loadGrievances() {
+      if (tab !== 'grievances') return;
+      try {
+        const res = await api.get('/api/founder-v2/grievances');
+        setGrievanceData(res);
+      } catch (e) {
+        console.error('Grievances load failed', e);
+      }
+    }
+    loadGrievances();
+  }, [tab]);
 
   const filteredPoliticians = useMemo(() => {
     if (!data) return [];
@@ -244,6 +258,7 @@ export default function FounderDashboard({ onPoliticianClick }: { onPoliticianCl
           { key: 'risk', label: 'Risk Watch', icon: AlertTriangle },
           { key: 'activity', label: 'Activity Feed', icon: Activity },
           { key: 'map', label: 'State Map', icon: Globe },
+          { key: 'grievances', label: 'Grievances', icon: Megaphone },
         ].map(t => {
           const Icon = t.icon;
           const active = tab === t.key;
@@ -345,6 +360,74 @@ export default function FounderDashboard({ onPoliticianClick }: { onPoliticianCl
             ))}
           </div>
         </div>
+      {tab === 'grievances' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {!grievanceData ? (
+            <div style={{ padding: 40, textAlign: 'center', color: '#8899bb' }}>Loading grievance command center...</div>
+          ) : (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: isMob ? '1fr' : 'repeat(4, 1fr)', gap: 12 }}>
+                <SummaryBox label="Total Open" value={grievanceData.total_open} color="#ffa726" />
+                <SummaryBox label="SLA Breaches" value={grievanceData.total_sla_breaches} color={grievanceData.total_sla_breaches ? '#ff5555' : '#00c864'} />
+                <SummaryBox label="Categories" value={grievanceData.category_summary?.length || 0} color="#42a5f5" />
+                <SummaryBox label="Districts Affected" value={grievanceData.district_heatmap?.length || 0} color="#ab47bc" />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: isMob ? '1fr' : '1fr 1fr', gap: 16 }}>
+                <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: 16 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#f0f4ff', marginBottom: 12 }}>By Category</div>
+                  {(grievanceData.category_summary || []).map((c: any) => (
+                    <div key={c.category} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <span style={{ fontSize: 12, color: '#8899bb' }}>{c.category || 'Uncategorized'}</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: c.open_count > 0 ? '#ffa726' : '#00c864' }}>{c.open_count || 0} open / {c.count} total</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: 16 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#f0f4ff', marginBottom: 12 }}>District Heatmap</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 8 }}>
+                    {(grievanceData.district_heatmap || []).slice(0, 12).map((d: any) => (
+                      <div key={d.district} style={{ background: d.open_count > 5 ? 'rgba(255,85,85,0.12)' : d.open_count > 0 ? 'rgba(255,167,38,0.12)' : 'rgba(0,200,100,0.12)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: 10, textAlign: 'center' }}>
+                        <div style={{ fontSize: 11, color: '#8899bb' }}>{d.district}</div>
+                        <div style={{ fontSize: 18, fontWeight: 900, color: d.open_count > 0 ? '#ff7777' : '#00c864' }}>{d.open_count}</div>
+                        <div style={{ fontSize: 10, color: '#8899bb' }}>{d.total} total</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {grievanceData.sla_breaches?.length > 0 && (
+                <div style={{ background: 'rgba(255,85,85,0.08)', border: '1px solid rgba(255,85,85,0.2)', borderRadius: 12, padding: 16 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#ff7777', marginBottom: 12 }}>⚠ SLA Breaches (>14 days)</div>
+                  {grievanceData.sla_breaches.map((g: any) => (
+                    <div key={g.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,85,85,0.1)' }}>
+                      <div>
+                        <div style={{ fontSize: 12, color: '#f0f4ff', fontWeight: 700 }}>{g.subject || 'Untitled grievance'}</div>
+                        <div style={{ fontSize: 11, color: '#ffaaaa' }}>{g.politician_name} · {g.district} · {g.days_open} days open</div>
+                      </div>
+                      <span style={{ padding: '3px 8px', borderRadius: 6, background: 'rgba(255,85,85,0.2)', color: '#ff7777', fontSize: 10, fontWeight: 800 }}>{g.status}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#f0f4ff', marginBottom: 12 }}>Top Unresolved Grievances</div>
+                {(grievanceData.top_unresolved || []).map((g: any) => (
+                  <div key={g.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div>
+                      <div style={{ fontSize: 12, color: '#f0f4ff', fontWeight: 700 }}>{g.subject || 'Untitled grievance'}</div>
+                      <div style={{ fontSize: 11, color: '#8899bb' }}>{g.politician_name} · {g.district} · {g.category || 'No category'} · {g.days_open} days</div>
+                    </div>
+                    <span style={{ padding: '3px 8px', borderRadius: 6, background: g.priority === 'High' ? 'rgba(255,85,85,0.15)' : 'rgba(255,167,38,0.12)', color: g.priority === 'High' ? '#ff7777' : '#ffa726', fontSize: 10, fontWeight: 800 }}>{g.priority}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
       )}
     </div>
   );
@@ -436,4 +519,13 @@ function activityColor(type: string) {
   if (type === 'media') return '#26c6da';
   if (type === 'opposition') return '#ff5555';
   return '#00d4aa';
+}
+
+function SummaryBox({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: 16 }}>
+      <div style={{ fontSize: 24, fontWeight: 900, color }}>{value}</div>
+      <div style={{ fontSize: 11, color: '#8899bb', marginTop: 4, textTransform: 'uppercase', letterSpacing: 0.6 }}>{label}</div>
+    </div>
+  );
 }

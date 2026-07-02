@@ -469,4 +469,87 @@ router.get('/dashboard', authMiddleware, async (req, res) => {
   }
 });
 
+
+
+// ── GRIEVANCE COMMAND CENTER ─────────────────────────────────
+router.get('/grievances', authMiddleware, async (req, res) => {
+  if (!requireSuperAdmin(req, res)) return;
+  try {
+    // ── Summary by status ──
+    const [statusSummary] = await pool.query(`
+      SELECT status, COUNT(*) AS count
+      FROM grievances
+      GROUP BY status
+      ORDER BY count DESC
+    `);
+
+    // ── Summary by category ──
+    const [categorySummary] = await pool.query(`
+      SELECT category, COUNT(*) AS count,
+        SUM(CASE WHEN status NOT IN ('Resolved','Closed') THEN 1 ELSE 0 END) AS open_count
+      FROM grievances
+      GROUP BY category
+      ORDER BY count DESC
+    `);
+
+    // ── SLA breaches: pending > 14 days ──
+    const [slaBreaches] = await pool.query(`
+      SELECT g.*, p.full_name AS politician_name, p.constituency_name, p.district,
+        DATEDIFF(NOW(), g.created_at) AS days_open
+      FROM grievances g
+      LEFT JOIN politician_profiles p ON g.politician_id = p.id
+      WHERE g.status NOT IN ('Resolved','Closed')
+        AND g.created_at <= DATE_SUB(NOW(), INTERVAL 14 DAY)
+      ORDER BY g.created_at ASC
+      LIMIT 25
+    `);
+
+    // ── District heatmap ──
+    const [districtHeatmap] = await pool.query(`
+      SELECT district, COUNT(*) AS total,
+        SUM(CASE WHEN status NOT IN ('Resolved','Closed') THEN 1 ELSE 0 END) AS open_count
+      FROM grievances g
+      LEFT JOIN politician_profiles p ON g.politician_id = p.id
+      WHERE p.district IS NOT NULL
+      GROUP BY district
+      ORDER BY open_count DESC, total DESC
+    `);
+
+    // ── Top unresolved grievances ──
+    const [topUnresolved] = await pool.query(`
+      SELECT g.*, p.full_name AS politician_name, p.constituency_name, p.district,
+        DATEDIFF(NOW(), g.created_at) AS days_open
+      FROM grievances g
+      LEFT JOIN politician_profiles p ON g.politician_id = p.id
+      WHERE g.status NOT IN ('Resolved','Closed')
+      ORDER BY g.priority = 'High' DESC, g.priority = 'Medium' DESC, g.created_at ASC
+      LIMIT 25
+    `);
+
+    // ── Recent trend: last 30 days ──
+    const [trend] = await pool.query(`
+      SELECT DATE(created_at) AS date, COUNT(*) AS filed,
+        SUM(CASE WHEN status IN ('Resolved','Closed') THEN 1 ELSE 0 END) AS resolved
+      FROM grievances
+      WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+      GROUP BY DATE(created_at)
+      ORDER BY date ASC
+    `);
+
+    res.json({
+      status_summary: statusSummary,
+      category_summary: categorySummary,
+      sla_breaches: slaBreaches,
+      district_heatmap: districtHeatmap,
+      top_unresolved: topUnresolved,
+      trend,
+      total_open: categorySummary.reduce((sum, c) => sum + (c.open_count || 0), 0),
+      total_sla_breaches: slaBreaches.length,
+    });
+  } catch (e) {
+    console.error('[founder-v2/grievances]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 export default router;
