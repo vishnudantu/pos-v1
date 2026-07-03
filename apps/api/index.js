@@ -483,6 +483,33 @@ app.put('/api/notifications/:id/read', authMiddleware, async (req, res) => {
   res.json({ success: true });
 });
 
+// ── TABLE COLUMN CACHE FOR CRUD SANITIZATION ─────────────
+const TABLE_COLUMNS = {};
+async function loadTableColumns(table) {
+  if (TABLE_COLUMNS[table]) return TABLE_COLUMNS[table];
+  const [rows] = await pool.query(`
+    SELECT column_name FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = ?
+  `, [table]);
+  const cols = new Set(rows.map(r => r.column_name));
+  TABLE_COLUMNS[table] = cols;
+  return cols;
+}
+
+// Global payload sanitizer: strips fields that do not exist in DB table
+export async function sanitizePayload(table, payload) {
+  const allowedCols = await loadTableColumns(table);
+  const clean = {};
+  for (const [k, v] of Object.entries(payload || {})) {
+    if (k === 'id') continue;
+    if (!allowedCols.has(k)) continue;
+    if (Array.isArray(v) || (v !== null && typeof v === 'object')) clean[k] = JSON.stringify(v);
+    else if (typeof v === 'string' && v.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) clean[k] = v.slice(0, 19).replace('T', ' ');
+    else clean[k] = v;
+  }
+  return clean;
+}
+
 const DEFAULT_WEBSITE_CONTENT = [
   { page: 'home', section: 'hero', content: { title: 'NETHRA', subtitle: 'Political Intelligence Operating System', cta: 'Request Demo' } },
   { page: 'home', section: 'vision', content: { heading: 'The AI brain every politician needs', body: 'Nethra watches everything, knows everything, and tells you exactly what to do next.' } },
@@ -659,7 +686,7 @@ function crud(table, searchCols = []) {
   router.post('/', authMiddleware, async (req, res) => {
     try {
       if (!roleAccess(req, res, 'write')) return;
-      const c = clean(req.body);
+      const c = await clean(req.body);
       const isSuperAdmin = req.user.role === 'super_admin';
       const polId = req.user.politician_id;
       if (isScoped && !isSuperAdmin) {
@@ -684,7 +711,7 @@ function crud(table, searchCols = []) {
   router.put('/:id', authMiddleware, async (req, res) => {
     try {
       if (!roleAccess(req, res, 'write')) return;
-      const c = clean(req.body, true);
+      const c = await clean(req.body, true);
       const isSuperAdmin = req.user.role === 'super_admin';
       const polId = req.user.politician_id;
       if (!isSuperAdmin) delete c.politician_id;
