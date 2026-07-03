@@ -59,7 +59,8 @@ async function resolveKey(names, politicianId, endpoint) {
 }
 
 async function loadKeys(politicianId, endpoint) {
-  const [or, groq, gemini, mistral, anthropic, nvidia, openai] = await Promise.all([
+  const [bynara, or, groq, gemini, mistral, anthropic, nvidia, openai] = await Promise.all([
+    resolveKey(['BYNARA_API_KEY', 'BYNARA'], politicianId, endpoint),
     resolveKey(['OPENROUTER_API_KEY'], politicianId, endpoint),
     resolveKey(['GROQ_API_KEY', 'GROQ'], politicianId, endpoint),
     resolveKey(['GEMINI_API_KEY', 'GEMINI'], politicianId, endpoint),
@@ -69,6 +70,7 @@ async function loadKeys(politicianId, endpoint) {
     resolveKey(['OPENAI_API_KEY', 'OPENAI'], politicianId, endpoint),
   ]);
   return [
+    { name: 'bynara',     key: bynara },
     { name: 'openrouter', key: or },
     { name: 'groq',       key: groq },
     { name: 'gemini',     key: gemini },
@@ -126,6 +128,19 @@ export async function aiChat({ messages, system, politicianId = null, endpoint =
 async function callProvider(name, key, system, messages, maxTokens, temperature, jsonMode) {
   const msgs = [{ role: 'system', content: system }, ...messages];
   const jf = jsonMode ? { response_format: { type: 'json_object' } } : {};
+
+  if (name === 'bynara') {
+    const baseUrl = process.env.BYNARA_BASE_URL || 'https://router.bynara.id/v1';
+    const model = (await getSavedModel('bynara')) || process.env.BYNARA_MODEL || 'gpt-4o-mini';
+    const r = await fetch(baseUrl + '/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+      body: JSON.stringify({ model, messages: msgs, max_tokens: maxTokens, temperature, ...jf }),
+    });
+    const d = await r.json();
+    if (!r.ok) { const e = new Error(d.error?.message || 'Bynara ' + r.status); e.status = r.status; throw e; }
+    return d.choices?.[0]?.message?.content || '';
+  }
 
   if (name === 'openrouter') {
     const model = (await getSavedModel('openrouter')) || process.env.OPENROUTER_MODEL || 'mistralai/mistral-7b-instruct:free';
@@ -246,6 +261,7 @@ async function streamProvider(name, key, system, messages, res) {
 
   // OpenAI-compatible streaming providers
   const oaiMap = {
+    bynara:     process.env.BYNARA_BASE_URL || 'https://router.bynara.id/v1',
     openrouter: 'https://openrouter.ai/api/v1/chat/completions',
     groq:       'https://api.groq.com/openai/v1/chat/completions',
     mistral:    'https://api.mistral.ai/v1/chat/completions',
@@ -254,6 +270,7 @@ async function streamProvider(name, key, system, messages, res) {
   };
 
   const modelMap = {
+    bynara:     (await getSavedModel('bynara')) || process.env.BYNARA_MODEL || 'gpt-4o-mini',
     openrouter: (await getSavedModel('openrouter')) || 'mistralai/mistral-7b-instruct:free',
     groq:       (await getSavedModel('groq')) || 'llama-3.3-70b-versatile',
     mistral:    'mistral-small-latest',
