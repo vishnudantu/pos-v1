@@ -35,7 +35,7 @@ const emptyForm = {
   state: '',
   district: '',
   total_voters: '',
-  registered_voters: '',
+  total_voters: '',
   area_sqkm: '',
   population: '',
   total_mandals: '',
@@ -75,7 +75,7 @@ export default function Constituency() {
 
   const statCards = profile ? [
     { label: 'Total Voters', value: ((profile.total_voters || 0) / 100000).toFixed(1) + 'L', icon: Users, color: '#42a5f5' },
-    { label: 'Registered', value: ((profile.registered_voters || 0) / 100000).toFixed(1) + 'L', icon: Users, color: '#00d4aa' },
+    { label: 'Registered', value: ((profile.total_voters || 0) / 100000).toFixed(1) + 'L', icon: Users, color: '#00d4aa' },
     { label: 'Area (sq km)', value: Number(profile.area_sqkm || 0).toLocaleString(), icon: Map, color: '#ffa726' },
     { label: 'Population', value: ((profile.population || 0) / 100000).toFixed(1) + 'L', icon: Users, color: '#00c864' },
     { label: 'Mandals', value: profile.total_mandals || 0, icon: Building, color: '#ef5350' },
@@ -98,7 +98,7 @@ export default function Constituency() {
       state: current?.state || '',
       district: current?.district || '',
       total_voters: String(current?.total_voters || ''),
-      registered_voters: String(current?.registered_voters || ''),
+      total_voters: String(current?.total_voters || ''),
       area_sqkm: String(current?.area_sqkm || ''),
       population: String(current?.population || ''),
       total_mandals: String(current?.total_mandals || ''),
@@ -125,7 +125,7 @@ export default function Constituency() {
       state: form.state,
       district: form.district,
       total_voters: num(form.total_voters),
-      registered_voters: num(form.registered_voters),
+      total_voters: num(form.total_voters),
       area_sqkm: num(form.area_sqkm),
       population: num(form.population),
       total_mandals: num(form.total_mandals),
@@ -343,7 +343,7 @@ export default function Constituency() {
                 </div>
                 <div>
                   <label style={{ fontSize: 12, color: '#8899bb', marginBottom: 6, display: 'block' }}>Registered Voters</label>
-                  <input type="number" className="input-field" value={form.registered_voters} onChange={e => setForm({ ...form, registered_voters: e.target.value })} />
+                  <input type="number" className="input-field" value={form.total_voters} onChange={e => setForm({ ...form, total_voters: e.target.value })} />
                 </div>
                 <div>
                   <label style={{ fontSize: 12, color: '#8899bb', marginBottom: 6, display: 'block' }}>Area (sq km)</label>

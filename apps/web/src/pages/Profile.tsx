@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, MapPin, Phone, Mail, Globe, Twitter, Facebook, Instagram, CreditCard as Edit3, Save, X, Plus, Trash2, Award, BookOpen, Calendar, TrendingUp, Users, Map, Building, BarChart3, CheckCircle, Star } from 'lucide-react';
 import { api } from '../lib/api';
+import { useAuth } from '../lib/auth';
 
 interface PoliticianProfile {
   id: string;
@@ -49,7 +50,6 @@ interface ConstituencyProfile {
   district: string;
   lok_sabha_number: string;
   total_voters: number;
-  registered_voters: number;
   area_sqkm: number;
   population: number;
   total_mandals: number;
@@ -121,6 +121,7 @@ export default function Profile() {
   const [saving, setSaving] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
   const [editingConst, setEditingConst] = useState(false);
+  const { user } = useAuth();
   const [showNewProfile, setShowNewProfile] = useState(false);
   const [showCasteModal, setShowCasteModal] = useState(false);
   const [editingCaste, setEditingCaste] = useState<CasteDemographic | null>(null);
@@ -246,13 +247,15 @@ export default function Profile() {
             Manage politician profiles, constituency data, and demographic analytics
           </p>
         </div>
-        <button className="btn-primary flex items-center gap-2" onClick={() => {
-          setProfileForm({ role: 'politician', is_active: true, languages: [], achievements: [] });
-          setShowNewProfile(true);
-        }}>
-          <Plus size={16} />
-          New Profile
-        </button>
+        {user?.role === 'super_admin' && (
+          <button className="btn-primary flex items-center gap-2" onClick={() => {
+            setProfileForm({ role: 'politician', is_active: true, languages: [], achievements: [] });
+            setShowNewProfile(true);
+          }}>
+            <Plus size={16} />
+            New Profile
+          </button>
+        )}
       </motion.div>
 
       {/* Profile selector strip */}
@@ -681,8 +684,8 @@ function ConstituencyTab({ constProfile, form, editing, saving, onChange, onEdit
               <div className="grid grid-cols-2 gap-3">
                 <NumField label="Total Voters" value={form.total_voters || 0} editing={editing}
                   onChange={v => onChange('total_voters', v)} />
-                <NumField label="Registered Voters" value={form.registered_voters || 0} editing={editing}
-                  onChange={v => onChange('registered_voters', v)} />
+                <NumField label="Registered Voters" value={form.total_voters || 0} editing={editing}
+                  onChange={v => onChange('total_voters', v)} />
                 <NumField label="Total Population" value={form.population || 0} editing={editing}
                   onChange={v => onChange('population', v)} />
                 <NumField label="Area (sq km)" value={form.area_sqkm || 0} editing={editing}

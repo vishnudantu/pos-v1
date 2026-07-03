@@ -830,6 +830,14 @@ app.post('/api/politician_profiles', authMiddleware, async (req, res) => {
 });
 app.put('/api/politician_profiles/:id', authMiddleware, async (req, res) => {
   try {
+    // Permission check: super_admin can edit any; politician_admin only their own
+    const isSuperAdmin = req.user.role === 'super_admin';
+    const targetId = parseInt(req.params.id, 10);
+    if (!isSuperAdmin) {
+      if (req.user.role !== 'politician_admin' || req.user.politician_id !== targetId) {
+        return res.status(403).json({ error: 'Forbidden: you can only edit your own profile' });
+      }
+    }
     const data = req.body;
     const clean = {};
     for (const [k, v] of Object.entries(data)) {

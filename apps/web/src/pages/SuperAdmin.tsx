@@ -170,7 +170,7 @@ interface AutofillExtra {
   state?: string;
   constituency_stats?: {
     total_voters?: number;
-    registered_voters?: number;
+    total_voters?: number;
     area_sqkm?: number;
     population?: number;
     total_mandals?: number;
@@ -514,7 +514,7 @@ export default function SuperAdmin({ onNavigate }: { onNavigate?: (page: string)
           constituency_name: extra.constituency_name || form.constituency_name,
           state: extra.state || form.state,
           total_voters: cs.total_voters ?? 0,
-          registered_voters: cs.registered_voters ?? 0,
+          total_voters: cs.total_voters ?? 0,
           area_sqkm: cs.area_sqkm ?? 0,
           population: cs.population ?? 0,
           total_mandals: cs.total_mandals ?? 0,

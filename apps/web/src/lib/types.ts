@@ -152,7 +152,7 @@ export interface Constituency {
   name: string;
   state: string;
   total_voters: number;
-  registered_voters: number;
+  total_voters: number;
   area_sqkm: number;
   population: number;
   mandals: number;
@@ -169,7 +169,7 @@ export interface ConstituencyProfile {
   state: string;
   district: string;
   total_voters: number;
-  registered_voters: number;
+  total_voters: number;
   area_sqkm: number;
   population: number;
   total_mandals: number;

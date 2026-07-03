@@ -220,3 +220,167 @@ select option {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+/* ── AGGRESSIVE GLOBAL FORM RESET ── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Target all possible input/select/textarea containers and raw elements */
+input,
+textarea,
+select,
+input[type="date"],
+input[type="datetime-local"],
+input[type="email"],
+input[type="month"],
+input[type="number"],
+input[type="password"],
+input[type="search"],
+input[type="tel"],
+input[type="text"],
+input[type="time"],
+input[type="url"],
+input[type="week"],
+[contenteditable="true"],
+select > option {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  color: #f0f4ff !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 10px !important;
+  padding: 10px 14px !important;
+  font-size: 14px !important;
+  font-family: 'Inter', system-ui, sans-serif !important;
+  outline: none !important;
+  transition: all 0.15s ease !important;
+  min-height: 40px !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #8899bb !important;
+  opacity: 1 !important;
+}
+
+input:focus,
+textarea:focus,
+select:focus,
+[contenteditable="true"]:focus {
+  border-color: #00d4aa !important;
+  background-color: rgba(255, 255, 255, 0.09) !important;
+  box-shadow: 0 0 0 2px rgba(0, 212, 170, 0.15) !important;
+}
+
+input:disabled,
+textarea:disabled,
+select:disabled {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+  color: #8899bb !important;
+  cursor: not-allowed !important;
+}
+
+/* Labels */
+label,
+.form-label,
+.field-label,
+.input-label {
+  color: #d0d8ee !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  margin-bottom: 6px !important;
+}
+
+/* Select dropdown options */
+select option,
+select optgroup {
+  background-color: #0f1623 !important;
+  color: #f0f4ff !important;
+}
+
+/* Date/calendar icon */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="month"]::-webkit-calendar-picker-indicator,
+input[type="week"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(1.2) !important;
+  cursor: pointer !important;
+}
+
+/* Force React-select, MUI, and other library inputs to inherit dark theme */
+.css-1wy0on6,
+.css-1dimb5e-singleValue,
+.css-qbdosj-Input,
+.css-1fdsijx-ValueContainer,
+.css-1s2u09g-MenuList,
+.css-26l3qy-menu,
+.css-1n7v3ny-option,
+.css-yt9ioa-option,
+.css-9gakcf-option,
+.css-b62m3t-container,
+.css-1f43avz-control,
+.css-1s2u09g-control,
+.MuiInputBase-root,
+.MuiOutlinedInput-root,
+.MuiInput-root,
+.MuiSelect-root,
+.MuiSelect-select,
+.MuiInputLabel-root,
+.MuiFormLabel-root {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  color: #f0f4ff !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+.MuiOutlinedInput-notchedOutline {
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border-color: #00d4aa !important;
+}
+
+/* Fix white background on floating label / material inputs */
+.MuiInputBase-input,
+.MuiInput-input,
+.MuiSelect-select {
+  color: #f0f4ff !important;
+}
+
+.MuiInputLabel-root.Mui-focused,
+.MuiFormLabel-root.Mui-focused {
+  color: #00d4aa !important;
+}
+
+/* Any element with bg-white or background white on dark pages */
+[class*="bg-white"],
+[style*="background: white"],
+[style*="background:#fff"],
+[style*="background-color: white"],
+[style*="background-color:#fff"],
+[style*="background-color: rgb(255, 255, 255)"] {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  color: #f0f4ff !important;
+}
+
+/* Fix placeholder across shadow DOM and pseudo elements */
+::placeholder {
+  color: #8899bb !important;
+  opacity: 1 !important;
+}
+
+/* Number input spinners */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  filter: invert(1) !important;
+}
+
+/* Checkbox / radio */
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: #00d4aa !important;
+  width: 18px !important;
+  height: 18px !important;
+}
