@@ -146,3 +146,106 @@ body {
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* Force dark theme on body and html so HeroUI portals inherit it */
+html, body {
+  background-color: #0b0f19;
+  color: #e2e8f0;
+}
+
+/* HeroUI / NextUI popover + listbox dark override */
+[data-slot="popover"],
+[data-slot="listbox"],
+[data-slot="base"],
+[role="listbox"],
+[role="dialog"],
+[role="menu"],
+.MuiMenu-paper,
+.MuiPopover-paper,
+.MuiAutocomplete-listbox,
+.nextui-popover-content,
+.heroui-popover-content,
+[data-radix-popper-content-wrapper],
+[data-radix-popover-content],
+[data-popper-reference-hidden],
+[data-side],
+[data-align] {
+  background-color: #1a1f2e !important;
+  color: #e2e8f0 !important;
+  border-color: #334155 !important;
+}
+
+/* All options inside any dropdown */
+[role="option"],
+[role="menuitem"],
+.select-item,
+.dropdown-item,
+.listbox-item {
+  background-color: #1a1f2e !important;
+  color: #e2e8f0 !important;
+}
+
+[role="option"]:hover,
+[role="menuitem"]:hover,
+.select-item:hover,
+.dropdown-item:hover,
+.listbox-item:hover {
+  background-color: #27314a !important;
+  color: #ffffff !important;
+}
+
+/* Force dark theme on body and html so HeroUI portals inherit it */
+html, body {
+  background-color: #0b0f19;
+  color: #e2e8f0;
+}
+
+/* HeroUI / NextUI / Radix popover + listbox dark override */
+[data-slot="popover"],
+[data-slot="listbox"],
+[data-slot="base"],
+[role="listbox"],
+[role="dialog"],
+[role="menu"],
+.MuiMenu-paper,
+.MuiPopover-paper,
+.MuiAutocomplete-listbox,
+.nextui-popover-content,
+.heroui-popover-content,
+[data-radix-popper-content-wrapper],
+[data-radix-popover-content],
+[data-side],
+[data-align] {
+  background-color: #1a1f2e !important;
+  color: #e2e8f0 !important;
+  border-color: #334155 !important;
+}
+
+/* All options inside any dropdown */
+[role="option"],
+[role="menuitem"],
+.select-item,
+.dropdown-item,
+.listbox-item {
+  background-color: #1a1f2e !important;
+  color: #e2e8f0 !important;
+}
+
+[role="option"]:hover,
+[role="menuitem"]:hover,
+.select-item:hover,
+.dropdown-item:hover,
+.listbox-item:hover {
+  background-color: #27314a !important;
+  color: #ffffff !important;
+}
+
+/* Force native selects, inputs, and date pickers into dark mode */
+select, input, textarea {
+  color-scheme: dark;
+}
+
+select option {
+  background-color: #1a1f2e;
+  color: #e2e8f0;
+}
