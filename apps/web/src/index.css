@@ -4,9 +4,27 @@
 @tailwind components;
 @tailwind utilities;
 
-* {
-  box-sizing: border-box;
+:root {
+  --nethra-teal: #00d4aa;
+  --nethra-blue: #1e88e5;
+  --nethra-amber: #ff9800;
+  --nethra-red: #ff5555;
+  --nethra-bg: #0b1221;
+  --nethra-bg-elevated: #0d1628;
+  --nethra-card: rgba(255, 255, 255, 0.04);
+  --nethra-card-hover: rgba(255, 255, 255, 0.07);
+  --nethra-border: rgba(255, 255, 255, 0.08);
+  --nethra-border-strong: rgba(255, 255, 255, 0.14);
+  --nethra-text: #f0f4ff;
+  --nethra-text-secondary: #8899bb;
+  --nethra-text-tertiary: rgba(136, 153, 187, 0.6);
+  --nethra-radius: 16px;
+  --nethra-radius-sm: 10px;
+  --nethra-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  --nethra-glow-teal: 0 0 30px rgba(0, 212, 170, 0.25);
 }
+
+* { box-sizing: border-box; }
 
 html {
   font-family: 'Inter', system-ui, sans-serif;
@@ -18,234 +36,78 @@ body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
-  background: linear-gradient(135deg, #0B1221 0%, #0F172A 50%, #0B1221 100%);
-  color: #F1F5F9;
+  background: var(--nethra-bg);
+  background-image:
+    radial-gradient(circle at 15% 0%, rgba(0, 212, 170, 0.08) 0%, transparent 35%),
+    radial-gradient(circle at 85% 100%, rgba(30, 136, 229, 0.08) 0%, transparent 35%);
+  color: var(--nethra-text);
+  overflow-x: hidden;
 }
 
-/* === GOD LEVEL GLASS CARDS === */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(136, 153, 187, 0.25); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(136, 153, 187, 0.45); }
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  margin: 0;
+}
+
+select, input, textarea { color-scheme: dark; }
+select option { background-color: #151b2e; color: #e2e8f0; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.animate-spin { animation: spin 1s linear infinite; }
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+.animate-float { animation: float 6s ease-in-out infinite; }
+
 @layer components {
-  .glass-card {
-    @apply relative overflow-hidden;
-    @apply bg-glass-100 backdrop-blur-xl;
-    @apply border border-white/10;
-    @apply rounded-3xl shadow-2xl;
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  .nethra-glass {
+    background: var(--nethra-card);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--nethra-border);
+    border-radius: var(--nethra-radius);
   }
-  
-  .glass-card:hover {
-    @apply bg-glass-200;
-    border-color: white/20;
-    box-shadow: 0 25px 50px -12px rgba(139, 92, 246, 0.25);
-    transform: translateY(-4px);
-  }
-  
-  .glass-card-glow {
-    @apply glass-card;
-    animation: glow 3s ease-in-out infinite alternate;
-  }
-  
-  /* === PREMIUM BUTTONS === */
-  .btn-primary {
-    @apply relative overflow-hidden;
-    @apply bg-gradient-to-r from-brand-600 to-accent-500;
-    @apply text-white font-semibold;
-    @apply px-8 py-4 rounded-2xl;
-    @apply shadow-lg shadow-brand-500/30;
-    transition: all 0.3s ease;
-  }
-  
-  .btn-primary:hover {
-    @apply shadow-xl shadow-brand-500/50;
+  .nethra-glass-hover { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+  .nethra-glass-hover:hover {
+    background: var(--nethra-card-hover);
+    border-color: var(--nethra-border-strong);
     transform: translateY(-2px);
   }
-  
-  .btn-primary:active {
-    transform: translateY(0);
+  .nethra-gradient-text {
+    background: linear-gradient(135deg, var(--nethra-teal), var(--nethra-blue));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
-  
-  /* === GRADIENT TEXT === */
-  .gradient-text {
-    @apply bg-gradient-to-r from-brand-400 via-accent-400 to-brand-400;
-    @apply bg-clip-text text-transparent;
-    background-size: 200% auto;
-    animation: gradient-shift 3s linear infinite;
+  .nethra-focus-ring:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(0, 212, 170, 0.35);
   }
-  
-  /* === STAT CARDS === */
-  .stat-card {
-    @apply glass-card p-6;
-    @apply flex flex-col;
-  }
-  
-  .stat-card-icon {
-    @apply w-14 h-14 rounded-2xl;
-    @apply flex items-center justify-center;
-    @apply bg-gradient-to-br from-brand-500/20 to-accent-500/20;
-    @apply border border-brand-500/30;
-    @apply mb-4;
-  }
-  
-  /* === INPUT FIELDS === */
-  .input-premium {
-    @apply w-full px-5 py-4 rounded-2xl;
-    @apply bg-white/5 border border-white/10;
-    @apply text-white placeholder-white/40;
-    @apply focus:outline-none focus:border-brand-500/50;
-    @apply focus:bg-white/10;
-    transition: all 0.3s ease;
-  }
-  
-  /* === BADGES === */
-  .badge-gradient {
-    @apply px-3 py-1 rounded-full text-xs font-semibold;
-    @apply bg-gradient-to-r from-brand-500 to-accent-500;
-    @apply text-white;
-  }
-  
-  /* === SCROLLBAR === */
-  ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-  
-  ::-webkit-scrollbar-track {
-    @apply bg-dark-200;
-  }
-  
-  ::-webkit-scrollbar-thumb {
-    @apply bg-brand-500/50 rounded-full;
-  }
-  
-  ::-webkit-scrollbar-thumb:hover {
-    @apply bg-brand-500/70;
-  }
+  .touch-min { min-height: 48px; min-width: 48px; }
 }
 
-/* === ANIMATIONS === */
-@keyframes gradient-shift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+.floating-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.35;
+  pointer-events: none;
 }
-
-@keyframes glow {
-  0% { box-shadow: 0 0 20px rgba(139, 92, 246, 0.3); }
-  100% { box-shadow: 0 0 40px rgba(139, 92, 246, 0.6); }
-}
-
-/* === UTILITIES === */
-.text-balance {
-  text-wrap: balance;
-}
-
-.scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
-}
-
-/* Force dark theme on body and html so HeroUI portals inherit it */
-html, body {
-  background-color: #0b0f19;
-  color: #e2e8f0;
-}
-
-/* HeroUI / NextUI popover + listbox dark override */
-[data-slot="popover"],
-[data-slot="listbox"],
-[data-slot="base"],
-[role="listbox"],
-[role="dialog"],
-[role="menu"],
-.MuiMenu-paper,
-.MuiPopover-paper,
-.MuiAutocomplete-listbox,
-.nextui-popover-content,
-.heroui-popover-content,
-[data-radix-popper-content-wrapper],
-[data-radix-popover-content],
-[data-popper-reference-hidden],
-[data-side],
-[data-align] {
-  background-color: #1a1f2e !important;
-  color: #e2e8f0 !important;
-  border-color: #334155 !important;
-}
-
-/* All options inside any dropdown */
-[role="option"],
-[role="menuitem"],
-.select-item,
-.dropdown-item,
-.listbox-item {
-  background-color: #1a1f2e !important;
-  color: #e2e8f0 !important;
-}
-
-[role="option"]:hover,
-[role="menuitem"]:hover,
-.select-item:hover,
-.dropdown-item:hover,
-.listbox-item:hover {
-  background-color: #27314a !important;
-  color: #ffffff !important;
-}
-
-/* Force dark theme on body and html so HeroUI portals inherit it */
-html, body {
-  background-color: #0b0f19;
-  color: #e2e8f0;
-}
-
-/* HeroUI / NextUI / Radix popover + listbox dark override */
-[data-slot="popover"],
-[data-slot="listbox"],
-[data-slot="base"],
-[role="listbox"],
-[role="dialog"],
-[role="menu"],
-.MuiMenu-paper,
-.MuiPopover-paper,
-.MuiAutocomplete-listbox,
-.nextui-popover-content,
-.heroui-popover-content,
-[data-radix-popper-content-wrapper],
-[data-radix-popover-content],
-[data-side],
-[data-align] {
-  background-color: #1a1f2e !important;
-  color: #e2e8f0 !important;
-  border-color: #334155 !important;
-}
-
-/* All options inside any dropdown */
-[role="option"],
-[role="menuitem"],
-.select-item,
-.dropdown-item,
-.listbox-item {
-  background-color: #1a1f2e !important;
-  color: #e2e8f0 !important;
-}
-
-[role="option"]:hover,
-[role="menuitem"]:hover,
-.select-item:hover,
-.dropdown-item:hover,
-.listbox-item:hover {
-  background-color: #27314a !important;
-  color: #ffffff !important;
-}
-
-/* Force native selects, inputs, and date pickers into dark mode */
-select, input, textarea {
-  color-scheme: dark;
-}
-
-select option {
-  background-color: #1a1f2e;
-  color: #e2e8f0;
-}
+.floating-orb.teal { background: radial-gradient(circle, var(--nethra-teal), transparent 70%); }
+.floating-orb.blue { background: radial-gradient(circle, var(--nethra-blue), transparent 70%); }
+.floating-orb.amber { background: radial-gradient(circle, var(--nethra-amber), transparent 70%); }

@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, MapPin, Phone, Mail, Globe, Twitter, Facebook, Instagram, CreditCard as Edit3, Save, X, Plus, Trash2, Award, BookOpen, Calendar, TrendingUp, Users, Map, Building, BarChart3, CheckCircle, Star } from 'lucide-react';
 import { api } from '../lib/api';
+import { useAuth } from '../lib/auth';
 
 interface PoliticianProfile {
   id: string;
@@ -112,6 +113,8 @@ const SWING_COLORS: Record<string, string> = {
 };
 
 export default function Profile() {
+  const { user } = useAuth();
+
   const [activeTab, setActiveTab] = useState(0);
   const [profiles, setProfiles] = useState<PoliticianProfile[]>([]);
   const [selectedProfile, setSelectedProfile] = useState<PoliticianProfile | null>(null);
@@ -246,13 +249,15 @@ export default function Profile() {
             Manage politician profiles, constituency data, and demographic analytics
           </p>
         </div>
-        <button className="btn-primary flex items-center gap-2" onClick={() => {
+        {user?.role === 'super_admin' && (
+<button className="btn-primary flex items-center gap-2" onClick={() => {
           setProfileForm({ role: 'politician', is_active: true, languages: [], achievements: [] });
           setShowNewProfile(true);
         }}>
           <Plus size={16} />
           New Profile
         </button>
+)}
       </motion.div>
 
       {/* Profile selector strip */}

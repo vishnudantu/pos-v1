@@ -7,7 +7,6 @@ import { useI18n } from '../../lib/i18n';
 
 interface HeaderProps {
   title: string;
-  subtitle?: string;
   sidebarCollapsed: boolean;
   onToggleSidebar: () => void;
   isMobile?: boolean;
@@ -67,31 +66,14 @@ const pageInfo: Record<string, { title: string; subtitle: string }> = {
   'website-admin': { title: 'Website CMS', subtitle: 'Manage website content blocks' },
 };
 
-interface SearchResult {
-  id: string;
-  type: string;
-  title: string;
-  subtitle: string;
-  page: string;
-}
-
-interface NotificationItem {
-  id: string;
-  title: string;
-  message: string;
-  link: string;
-  is_read: number;
-  created_at: string;
-}
+interface SearchResult { id: string; type: string; title: string; subtitle: string; page: string; }
+interface NotificationItem { id: string; title: string; message: string; link: string; is_read: number; created_at: string; }
 
 export default function Header({ title, sidebarCollapsed, onToggleSidebar, isMobile, mobileMenuOpen, onNavigate }: HeaderProps) {
   const { activePolitician, signOut, user } = useAuth();
   const { t, languages, language, setLanguage } = useI18n();
   const info = pageInfo[title] || { title, subtitle: '' };
-  const translatedTitle = (() => {
-    const label = t(`nav.${title}`);
-    return label.startsWith('nav.') ? info.title : label;
-  })();
+  const translatedTitle = (() => { const label = t(`nav.${title}`); return label.startsWith('nav.') ? info.title : label; })();
   const now = new Date();
   const dateStr = now.toLocaleDateString('en-IN', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
 
@@ -104,12 +86,7 @@ export default function Header({ title, sidebarCollapsed, onToggleSidebar, isMob
     if (user?.email) return user.email.split('@')[0];
     return 'Super Admin';
   })();
-  const initials = displayName
-    .split(' ')
-    .map(n => n[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
+  const initials = displayName.split(' ').map(n => n[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -141,9 +118,7 @@ export default function Header({ title, sidebarCollapsed, onToggleSidebar, isMob
         try {
           const data = await api.get(`/api/search?q=${encodeURIComponent(searchQuery.trim())}`) as SearchResult[];
           setSearchResults(data || []);
-        } catch {
-          setSearchResults([]);
-        }
+        } catch { setSearchResults([]); }
         setLoadingSearch(false);
       }, 300);
     } else {
@@ -158,9 +133,7 @@ export default function Header({ title, sidebarCollapsed, onToggleSidebar, isMob
       try {
         const data = await api.get('/api/notifications?limit=10') as NotificationItem[];
         setNotifications(data || []);
-      } catch {
-        setNotifications([]);
-      }
+      } catch { setNotifications([]); }
     }
     fetchNotifications();
   }, []);
@@ -171,9 +144,7 @@ export default function Header({ title, sidebarCollapsed, onToggleSidebar, isMob
     try {
       await api.put(`/api/notifications/${id}/read`, {});
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: 1 } : n));
-    } catch {
-      // ignore
-    }
+    } catch { /* ignore */ }
   }
 
   function handleSignOut() {
@@ -187,77 +158,44 @@ export default function Header({ title, sidebarCollapsed, onToggleSidebar, isMob
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.4 }}
       className="sticky top-0 z-30 flex items-center justify-between px-3 sm:px-4 md:px-6 py-3 md:py-4"
-      style={{
-        background: 'linear-gradient(180deg, rgba(6, 11, 24, 0.96), rgba(6, 11, 24, 0.82))',
-        backdropFilter: 'blur(24px)',
-        borderBottom: '1px solid rgba(255,255,255,0.08)',
-        boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
-        minHeight: 64,
-      }}
+      style={{ background: 'linear-gradient(180deg, rgba(6, 11, 24, 0.96), rgba(6, 11, 24, 0.82))', backdropFilter: 'blur(24px)', borderBottom: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 10px 30px rgba(0,0,0,0.35)', minHeight: 64 }}
     >
       <div className="flex items-center gap-2 sm:gap-3 md:gap-4 min-w-0">
-        <button
-          onClick={onToggleSidebar}
-          className="w-9 h-9 flex-shrink-0 rounded-xl flex items-center justify-center transition-all"
-          style={{ background: 'rgba(255,255,255,0.06)', color: '#8899bb' }}
-        >
+        <button onClick={onToggleSidebar} className="w-9 h-9 flex-shrink-0 rounded-xl flex items-center justify-center transition-all" style={{ background: 'rgba(255,255,255,0.06)', color: '#8899bb' }}>
           {(isMobile ? mobileMenuOpen : !sidebarCollapsed) ? <X size={18} /> : <Menu size={18} />}
         </button>
         <div className="min-w-0">
-          <h1 className="font-bold text-base sm:text-lg truncate" style={{ color: '#f0f4ff', fontFamily: 'Space Grotesk, sans-serif' }}>
-            {translatedTitle}
-          </h1>
-          <p className="hidden sm:block truncate" style={{ fontSize: 12, color: '#8899bb' }}>{info.subtitle}</p>
+          <h1 className="font-bold text-base sm:text-lg truncate font-display text-content">{translatedTitle}</h1>
+          <p className="hidden sm:block truncate text-xs text-content-secondary">{info.subtitle}</p>
         </div>
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3">
         <div ref={searchRef} className="relative">
-          <div className="hidden lg:flex items-center gap-2 px-3 py-2 rounded-xl"
-            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', minWidth: 220 }}>
+          <div className="hidden lg:flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', minWidth: 220 }}>
             <Search size={15} style={{ color: '#8899bb' }} />
-            <input
-              type="text"
-              placeholder={t('header.search')}
-              value={searchQuery}
-              onFocus={() => setSearchOpen(true)}
-              onChange={e => { setSearchQuery(e.target.value); setSearchOpen(true); }}
-              style={{ background: 'transparent', border: 'none', outline: 'none', color: '#f0f4ff', fontSize: 13, width: '100%' }}
-            />
+            <input type="text" placeholder={t('header.search')} value={searchQuery} onFocus={() => setSearchOpen(true)} onChange={e => { setSearchQuery(e.target.value); setSearchOpen(true); }}
+              className="bg-transparent border-none outline-none text-content text-sm w-full" />
           </div>
 
-          <button className="hidden md:flex lg:hidden w-9 h-9 rounded-xl items-center justify-center"
-            onClick={() => setSearchOpen(o => !o)}
-            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#8899bb' }}>
+          <button className="flex lg:hidden w-9 h-9 rounded-xl items-center justify-center" onClick={() => setSearchOpen(o => !o)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#8899bb' }}>
             <Search size={16} />
           </button>
 
           {searchOpen && (
-            <div className="absolute right-0 top-12 w-80 rounded-xl overflow-hidden z-40"
-              style={{ background: 'rgba(8,14,26,0.98)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div className="absolute right-0 top-12 w-[85vw] sm:w-80 rounded-xl overflow-hidden z-40 bg-surface-elevated border border-border shadow-nethra">
               <div className="p-3 border-b border-white/10 lg:hidden">
-                <input
-                  type="text"
-                  placeholder={t('header.search')}
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  className="w-full rounded-lg px-3 py-2 text-sm"
-                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#f0f4ff' }}
-                />
+                <input type="text" placeholder={t('header.search')} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm bg-white/[0.06] border border-white/10 text-content" />
               </div>
               {loadingSearch ? (
-                <div className="p-4 text-sm" style={{ color: '#8899bb' }}>Searching...</div>
+                <div className="p-4 text-sm text-content-secondary">Searching...</div>
               ) : searchResults.length === 0 ? (
-                <div className="p-4 text-sm" style={{ color: '#8899bb' }}>No results.</div>
+                <div className="p-4 text-sm text-content-secondary">{searchQuery.trim() ? 'No results.' : 'Start typing to search...'}</div>
               ) : (
                 searchResults.map(result => (
-                  <button
-                    key={`${result.type}-${result.id}`}
-                    onClick={() => { onNavigate(result.page); setSearchOpen(false); }}
-                    className="w-full text-left px-4 py-3 hover:bg-white/5 transition-colors"
-                  >
-                    <div style={{ fontSize: 12, color: '#f0f4ff', fontWeight: 600 }}>{result.title}</div>
-                    <div style={{ fontSize: 11, color: '#8899bb' }}>{result.subtitle}</div>
+                  <button key={`${result.type}-${result.id}`} onClick={() => { onNavigate(result.page); setSearchOpen(false); }} className="w-full text-left px-4 py-3 hover:bg-white/5 transition-colors">
+                    <div className="text-xs sm:text-sm text-content font-semibold">{result.title}</div>
+                    <div className="text-[10px] sm:text-xs text-content-secondary">{result.subtitle}</div>
                   </button>
                 ))
               )}
@@ -266,38 +204,26 @@ export default function Header({ title, sidebarCollapsed, onToggleSidebar, isMob
         </div>
 
         <div className="hidden xl:block text-right">
-          <div style={{ fontSize: 11, color: '#8899bb' }}>{dateStr}</div>
-          <div style={{ fontSize: 11, color: primaryColor, fontWeight: 600 }}>
-            {now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-          </div>
+          <div className="text-[11px] text-content-secondary">{dateStr}</div>
+          <div className="text-[11px] font-semibold" style={{ color: primaryColor }}>{now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</div>
         </div>
 
         <div ref={notifRef} className="relative">
-          <button className="w-9 h-9 rounded-xl flex items-center justify-center transition-all"
-            onClick={() => setNotificationsOpen(o => !o)}
-            style={{ background: 'rgba(255,255,255,0.06)', color: '#8899bb' }}>
+          <button className="w-9 h-9 rounded-xl flex items-center justify-center transition-all" onClick={() => setNotificationsOpen(o => !o)} style={{ background: 'rgba(255,255,255,0.06)', color: '#8899bb' }}>
             <Bell size={17} />
           </button>
           {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-xs font-bold"
-              style={{ background: '#ff5555', color: '#fff', fontSize: 9 }}>{unreadCount}</span>
+            <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: '#ff5555', color: '#fff', fontSize: 9 }}>{unreadCount}</span>
           )}
           {notificationsOpen && (
-            <div className="absolute right-0 top-12 w-80 rounded-xl overflow-hidden z-40"
-              style={{ background: 'rgba(8,14,26,0.98)', border: '1px solid rgba(255,255,255,0.08)' }}>
-              <div className="px-4 py-3 text-xs font-semibold" style={{ color: '#8899bb' }}>
-                {t('header.notifications')}
-              </div>
+            <div className="absolute right-0 top-12 w-[85vw] sm:w-80 rounded-xl overflow-hidden z-40 bg-surface-elevated border border-border shadow-nethra">
+              <div className="px-4 py-3 text-xs font-semibold text-content-secondary">{t('header.notifications')}</div>
               {notifications.length === 0 ? (
-                <div className="px-4 pb-4 text-sm" style={{ color: '#8899bb' }}>No notifications yet.</div>
+                <div className="px-4 pb-4 text-sm text-content-secondary">No notifications yet.</div>
               ) : notifications.map(note => (
-                <button
-                  key={note.id}
-                  onClick={() => { if (note.link) onNavigate(note.link); markNotificationRead(note.id); setNotificationsOpen(false); }}
-                  className="w-full text-left px-4 py-3 hover:bg-white/5 transition-colors"
-                >
-                  <div style={{ fontSize: 12, color: '#f0f4ff', fontWeight: 600 }}>{note.title}</div>
-                  <div style={{ fontSize: 11, color: '#8899bb' }}>{note.message}</div>
+                <button key={note.id} onClick={() => { if (note.link) onNavigate(note.link); markNotificationRead(note.id); setNotificationsOpen(false); }} className="w-full text-left px-4 py-3 hover:bg-white/5 transition-colors">
+                  <div className="text-xs sm:text-sm text-content font-semibold">{note.title}</div>
+                  <div className="text-[10px] sm:text-xs text-content-secondary">{note.message}</div>
                 </button>
               ))}
             </div>
@@ -305,39 +231,26 @@ export default function Header({ title, sidebarCollapsed, onToggleSidebar, isMob
         </div>
 
         <div ref={profileRef} className="relative">
-          <button className="hidden sm:flex w-8 h-8 rounded-lg items-center justify-center flex-shrink-0"
-            onClick={() => setProfileOpen(o => !o)}
-            style={{ background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})` }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#060b18' }}>{initials}</span>
+          <button className="hidden sm:flex w-8 h-8 rounded-lg items-center justify-center flex-shrink-0" onClick={() => setProfileOpen(o => !o)} style={{ background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})` }}>
+            <span className="text-[11px] font-bold text-[#060b18]">{initials}</span>
           </button>
           {profileOpen && (
-            <div className="absolute right-0 top-12 w-56 rounded-xl overflow-hidden z-40"
-              style={{ background: 'rgba(8,14,26,0.98)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div className="absolute right-0 top-12 w-56 rounded-xl overflow-hidden z-40 bg-surface-elevated border border-border shadow-nethra">
               {!isSuperAdmin && (
-                <button onClick={() => { onNavigate('profile'); setProfileOpen(false); }}
-                  className="w-full text-left px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-2">
+                <button onClick={() => { onNavigate('profile'); setProfileOpen(false); }} className="w-full text-left px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-2 text-content text-sm">
                   <User size={14} /> <span>{t('header.profile')}</span>
                 </button>
               )}
-              <button onClick={() => { onNavigate('settings'); setProfileOpen(false); }}
-                className="w-full text-left px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-2">
+              <button onClick={() => { onNavigate('settings'); setProfileOpen(false); }} className="w-full text-left px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-2 text-content text-sm">
                 <Settings size={14} /> <span>{t('header.settings')}</span>
               </button>
               <div className="px-4 py-3 border-t border-white/10">
-                <div style={{ fontSize: 11, color: '#8899bb', marginBottom: 8 }}>Language</div>
-                <select
-                  value={language}
-                  onChange={e => setLanguage(e.target.value as typeof language)}
-                  className="w-full rounded-lg px-2 py-1.5 text-xs"
-                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#f0f4ff' }}
-                >
-                  {languages.map(opt => (
-                    <option key={opt.code} value={opt.code}>{opt.label}</option>
-                  ))}
+                <div className="text-[11px] text-content-secondary mb-2">Language</div>
+                <select value={language} onChange={e => setLanguage(e.target.value as typeof language)} className="w-full rounded-lg px-2 py-1.5 text-xs bg-white/[0.06] border border-white/10 text-content" style={{ colorScheme: 'dark' }}>
+                  {languages.map(opt => <option key={opt.code} value={opt.code}>{opt.label}</option>)}
                 </select>
               </div>
-              <button onClick={handleSignOut}
-                className="w-full text-left px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-2 border-t border-white/10">
+              <button onClick={handleSignOut} className="w-full text-left px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-2 border-t border-white/10 text-content text-sm">
                 <LogOut size={14} /> <span>{t('header.logout')}</span>
               </button>
             </div>
