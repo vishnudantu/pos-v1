@@ -59,6 +59,19 @@ async function resolveKey(names, politicianId, endpoint) {
 }
 
 async function loadKeys(politicianId, endpoint) {
+  const providerPref = (process.env.AI_PROVIDER || '').toLowerCase();
+
+  // Bynara — OpenAI-compatible router
+  const bynaraBase = process.env.BYNARA_BASE_URL || 'https://router.bynara.id/v1';
+  const bynaraModel = process.env.BYNARA_MODEL || 'deepseek-3.2';
+  const bynaraKey = await resolveKey(['BYNARA_API_KEY'], politicianId, endpoint);
+  const bynaraAvailable = !!(bynaraKey && bynaraBase && bynaraModel);
+
+  // Ollama — local, no API key required
+  const ollamaBase = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+  const ollamaModel = process.env.OLLAMA_MODEL || 'llama3.1';
+  const ollamaAvailable = !!(ollamaBase && ollamaModel);
+
   const [or, groq, gemini, mistral, anthropic, nvidia, openai] = await Promise.all([
     resolveKey(['OPENROUTER_API_KEY'], politicianId, endpoint),
     resolveKey(['GROQ_API_KEY', 'GROQ'], politicianId, endpoint),
@@ -68,7 +81,8 @@ async function loadKeys(politicianId, endpoint) {
     resolveKey(['NVIDIA_API_KEY', 'NVIDIA', 'NVIDIABUILD', 'NVIDIABUILD-AUTOGEN-17', 'NVIDIABUILD-AUTOGEN-92'], politicianId, endpoint),
     resolveKey(['OPENAI_API_KEY', 'OPENAI'], politicianId, endpoint),
   ]);
-  return [
+
+  let chain = [
     { name: 'openrouter', key: or },
     { name: 'groq',       key: groq },
     { name: 'gemini',     key: gemini },
@@ -77,6 +91,24 @@ async function loadKeys(politicianId, endpoint) {
     { name: 'nvidia',     key: nvidia },
     { name: 'openai',     key: openai },
   ].filter(p => p.key);
+
+  const bynaraEntry = { name: 'bynara', key: bynaraKey, base: bynaraBase, model: bynaraModel };
+
+  if (providerPref === 'bynara' && bynaraAvailable) {
+    chain.unshift(bynaraEntry);
+  } else if (bynaraAvailable) {
+    chain.push(bynaraEntry);
+  }
+
+  const ollamaEntry = { name: 'ollama', key: 'local', ollamaBase, ollamaModel };
+
+  if (providerPref === 'ollama' && ollamaAvailable) {
+    chain.unshift(ollamaEntry);
+  } else if (chain.length === 0 && ollamaAvailable) {
+    chain.push(ollamaEntry);
+  }
+
+  return chain;
 }
 
 export async function aiComplete({ prompt, system, politicianId = null, endpoint = 'general', maxTokens = 1500, temperature = 0.7, jsonMode = false }) {
@@ -215,6 +247,19 @@ async function callProvider(name, key, system, messages, maxTokens, temperature,
     return d.choices?.[0]?.message?.content || '';
   }
 
+  if (name === 'bynara') {
+    const base = (key && key.base) || process.env.BYNARA_BASE_URL || 'https://router.bynara.id/v1';
+    const model = (key && key.model) || process.env.BYNARA_MODEL || 'deepseek-3.2';
+    const r = await fetch(base.replace(/\/$/, '') + '/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (key.key || key) },
+      body: JSON.stringify({ model, messages: msgs, max_tokens: maxTokens, temperature, ...jf }),
+    });
+    const d = await r.json();
+    if (!r.ok) { const e = new Error(d.error?.message || 'Bynara ' + r.status); e.status = r.status; throw e; }
+    return d.choices?.[0]?.message?.content || '';
+  }
+
   throw new Error('Unknown provider: ' + name);
 }
 
@@ -338,6 +383,32 @@ async function streamProvider(name, key, system, messages, res) {
         if (!line.startsWith('data: ')) continue;
         try {
           const t = JSON.parse(line.slice(6)).delta?.text || '';
+          if (t) { full += t; res.write(t); }
+        } catch (_) {}
+      }
+    }
+    return full;
+  }
+
+  if (name === 'bynara') {
+    const base = process.env.BYNARA_BASE_URL || 'https://router.bynara.id/v1';
+    const model = process.env.BYNARA_MODEL || 'deepseek-3.2';
+    const upstream = await fetch(base.replace(/\/$/, '') + '/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+      body: JSON.stringify({ model, messages: msgs, stream: true, max_tokens: 2048, temperature: 0.7 }),
+    });
+    if (!upstream.ok) { const e = new Error('Bynara ' + upstream.status); e.status = upstream.status; throw e; }
+    const reader = upstream.body.getReader();
+    const dec = new TextDecoder();
+    let full = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      for (const line of dec.decode(value, { stream: true }).split('\n')) {
+        if (!line.startsWith('data: ') || line === 'data: [DONE]') continue;
+        try {
+          const t = JSON.parse(line.slice(6)).choices?.[0]?.delta?.content || '';
           if (t) { full += t; res.write(t); }
         } catch (_) {}
       }

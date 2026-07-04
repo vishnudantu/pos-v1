@@ -32,6 +32,7 @@ Thumbs.db
 # Database
 *.sql
 !migrations/
+!migrations/*.sql
 
 # Secrets
 secrets/
