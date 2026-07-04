@@ -1,0 +1,1074 @@
+-- NETHRA POS-v1 — initial schema migration
+-- Idempotent: all CREATE TABLE use IF NOT EXISTS
+
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- Core & identity
+CREATE TABLE IF NOT EXISTS users (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  email VARCHAR(255) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+  role ENUM('super_admin','politician_admin','staff','field_worker') DEFAULT 'staff',
+  politician_id INT DEFAULT NULL,
+  is_active TINYINT(1) DEFAULT 1,
+  display_name VARCHAR(255) DEFAULT NULL,
+  two_factor_enabled TINYINT(1) DEFAULT 0,
+  two_factor_code_hash VARCHAR(255) DEFAULT NULL,
+  two_factor_expires DATETIME DEFAULT NULL,
+  last_login_at DATETIME DEFAULT NULL,
+  last_login_ip VARCHAR(45) DEFAULT NULL,
+  failed_login_attempts INT DEFAULT 0,
+  locked_until DATETIME DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id),
+  INDEX idx_role (role),
+  INDEX idx_active (is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS politician_profiles (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  full_name VARCHAR(255) NOT NULL,
+  display_name VARCHAR(255) DEFAULT NULL,
+  photo_url VARCHAR(500) DEFAULT NULL,
+  party VARCHAR(100) DEFAULT NULL,
+  designation VARCHAR(100) DEFAULT NULL,
+  constituency_name VARCHAR(255) DEFAULT NULL,
+  district VARCHAR(100) DEFAULT NULL,
+  state VARCHAR(100) DEFAULT NULL,
+  slug VARCHAR(100) DEFAULT NULL,
+  color_primary VARCHAR(7) DEFAULT '#00d4aa',
+  color_secondary VARCHAR(7) DEFAULT '#1e88e5',
+  role ENUM('politician','admin') DEFAULT 'politician',
+  email VARCHAR(255) DEFAULT NULL,
+  phone VARCHAR(50) DEFAULT NULL,
+  bio TEXT,
+  office_address TEXT,
+  website VARCHAR(255) DEFAULT NULL,
+  twitter_handle VARCHAR(100) DEFAULT NULL,
+  facebook_url VARCHAR(255) DEFAULT NULL,
+  instagram_handle VARCHAR(100) DEFAULT NULL,
+  youtube_channel VARCHAR(255) DEFAULT NULL,
+  education VARCHAR(255) DEFAULT NULL,
+  dob DATE DEFAULT NULL,
+  age INT DEFAULT NULL,
+  languages JSON,
+  achievements JSON,
+  lok_sabha_seat VARCHAR(255) DEFAULT NULL,
+  term_start DATE DEFAULT NULL,
+  term_end DATE DEFAULT NULL,
+  previous_terms INT DEFAULT 0,
+  election_year INT DEFAULT NULL,
+  subscription_status VARCHAR(50) DEFAULT 'active',
+  deployed_at DATETIME DEFAULT NULL,
+  auth_user_id INT DEFAULT NULL,
+  winning_margin DECIMAL(12,2) DEFAULT NULL,
+  vote_count INT DEFAULT NULL,
+  total_votes_polled INT DEFAULT NULL,
+  constituency_stats JSON,
+  is_active TINYINT(1) DEFAULT 1,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_slug (slug),
+  INDEX idx_email (email),
+  INDEX idx_role (role),
+  INDEX idx_active (is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS news_cache (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  headline VARCHAR(500) NOT NULL,
+  snippet TEXT,
+  source VARCHAR(100) DEFAULT NULL,
+  url TEXT,
+  category VARCHAR(50) DEFAULT NULL,
+  sentiment ENUM('positive','negative','neutral') DEFAULT 'neutral',
+  published_at DATETIME DEFAULT NULL,
+  fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  headline_hash VARCHAR(64) UNIQUE DEFAULT NULL,
+  INDEX idx_published (published_at),
+  INDEX idx_category (category)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Feature gating
+CREATE TABLE IF NOT EXISTS feature_modules (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  module_key VARCHAR(100) NOT NULL UNIQUE,
+  label VARCHAR(255) NOT NULL,
+  category VARCHAR(100) DEFAULT NULL,
+  description TEXT,
+  is_active TINYINT(1) DEFAULT 1,
+  is_future TINYINT(1) DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS feature_flags (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  feature_key VARCHAR(100) NOT NULL UNIQUE,
+  module_key VARCHAR(100) NOT NULL,
+  label VARCHAR(255) NOT NULL,
+  description TEXT,
+  is_active TINYINT(1) DEFAULT 1,
+  is_future TINYINT(1) DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_module (module_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS politician_module_access (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  module_key VARCHAR(100) NOT NULL,
+  is_enabled TINYINT(1) DEFAULT 1,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_pm (politician_id, module_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS role_module_access (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  role VARCHAR(50) NOT NULL,
+  module_key VARCHAR(100) NOT NULL,
+  is_enabled TINYINT(1) DEFAULT 1,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_rm (role, module_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS politician_feature_access (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  feature_key VARCHAR(100) NOT NULL,
+  is_enabled TINYINT(1) DEFAULT 1,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_pf (politician_id, feature_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS role_feature_access (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  role VARCHAR(50) NOT NULL,
+  feature_key VARCHAR(100) NOT NULL,
+  is_enabled TINYINT(1) DEFAULT 1,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_rf (role, feature_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS feature_flag_changes (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT DEFAULT NULL,
+  changed_by INT DEFAULT NULL,
+  flag_key VARCHAR(100) DEFAULT NULL,
+  change_type VARCHAR(100) DEFAULT NULL,
+  new_value VARCHAR(50) DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Platform / admin support tables
+CREATE TABLE IF NOT EXISTS platform_settings (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT DEFAULT NULL,
+  setting_key VARCHAR(100) NOT NULL,
+  setting_value TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_ps (politician_id, setting_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT DEFAULT NULL,
+  politician_id INT DEFAULT NULL,
+  action VARCHAR(50) DEFAULT NULL,
+  table_name VARCHAR(100) DEFAULT NULL,
+  record_id INT DEFAULT NULL,
+  metadata JSON,
+  ip_address VARCHAR(45) DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS notifications (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT DEFAULT NULL,
+  title VARCHAR(255) DEFAULT NULL,
+  message TEXT,
+  link VARCHAR(100) DEFAULT NULL,
+  is_read TINYINT(1) DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id),
+  INDEX idx_read (is_read)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS admin_reports (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT DEFAULT NULL,
+  report_type VARCHAR(50) DEFAULT NULL,
+  title VARCHAR(255) DEFAULT NULL,
+  summary TEXT,
+  content TEXT,
+  created_by INT DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS billing_records (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT DEFAULT NULL,
+  amount DECIMAL(10,2) DEFAULT 0,
+  status VARCHAR(50) DEFAULT NULL,
+  billing_period VARCHAR(50) DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS platform_metrics (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  metric_key VARCHAR(100) DEFAULT NULL,
+  metric_value DECIMAL(15,4) DEFAULT NULL,
+  recorded_at DATETIME DEFAULT NULL,
+  INDEX idx_key_time (metric_key, recorded_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS website_content (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  page VARCHAR(50) DEFAULT 'home',
+  section VARCHAR(50) DEFAULT NULL,
+  content JSON,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_page_section (page, section)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- AI training / context
+CREATE TABLE IF NOT EXISTS ai_context_profiles (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  scope VARCHAR(50) NOT NULL,
+  scope_id INT DEFAULT NULL,
+  context_type VARCHAR(50) NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  content TEXT NOT NULL,
+  is_active TINYINT(1) DEFAULT 1,
+  created_by INT DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_scope (scope, scope_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS ai_feedback (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT DEFAULT NULL,
+  endpoint VARCHAR(100) DEFAULT NULL,
+  prompt_summary TEXT,
+  ai_output TEXT,
+  feedback VARCHAR(20) DEFAULT NULL,
+  feedback_note TEXT,
+  reviewed_by INT DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Reference / global data
+CREATE TABLE IF NOT EXISTS constituencies (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  state VARCHAR(100) DEFAULT NULL,
+  district VARCHAR(100) DEFAULT NULL,
+  type VARCHAR(50) DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Politician-scoped operational tables
+CREATE TABLE IF NOT EXISTS grievances (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  petitioner_name VARCHAR(255) DEFAULT NULL,
+  subject VARCHAR(255) DEFAULT NULL,
+  description TEXT,
+  category VARCHAR(100) DEFAULT NULL,
+  priority VARCHAR(50) DEFAULT NULL,
+  location VARCHAR(255) DEFAULT NULL,
+  status VARCHAR(50) DEFAULT 'Pending',
+  assigned_to INT DEFAULT NULL,
+  resolution_notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id),
+  INDEX idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS grievance_timeline (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  grievance_id INT DEFAULT NULL,
+  status VARCHAR(50) DEFAULT NULL,
+  note TEXT,
+  changed_by INT DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_grievance (grievance_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS events (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  title VARCHAR(255) DEFAULT NULL,
+  location VARCHAR(255) DEFAULT NULL,
+  organizer VARCHAR(255) DEFAULT NULL,
+  event_type VARCHAR(100) DEFAULT NULL,
+  start_date DATETIME DEFAULT NULL,
+  end_date DATETIME DEFAULT NULL,
+  description TEXT,
+  status VARCHAR(50) DEFAULT 'Planned',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS team_members (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  name VARCHAR(255) DEFAULT NULL,
+  role VARCHAR(100) DEFAULT NULL,
+  department VARCHAR(100) DEFAULT NULL,
+  email VARCHAR(255) DEFAULT NULL,
+  phone VARCHAR(50) DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS voters (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  name VARCHAR(255) DEFAULT NULL,
+  voter_id VARCHAR(100) DEFAULT NULL,
+  mandal VARCHAR(100) DEFAULT NULL,
+  village VARCHAR(100) DEFAULT NULL,
+  phone VARCHAR(50) DEFAULT NULL,
+  caste VARCHAR(100) DEFAULT NULL,
+  age INT DEFAULT NULL,
+  sex VARCHAR(10) DEFAULT NULL,
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS booths (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  booth_number VARCHAR(50) DEFAULT NULL,
+  polling_station_name VARCHAR(255) DEFAULT NULL,
+  mandal VARCHAR(100) DEFAULT NULL,
+  village VARCHAR(100) DEFAULT NULL,
+  total_voters INT DEFAULT 0,
+  agent_assigned VARCHAR(255) DEFAULT NULL,
+  coverage_percent INT DEFAULT 0,
+  readiness_score INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS villages (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  village_name VARCHAR(255) DEFAULT NULL,
+  mandal_name VARCHAR(100) DEFAULT NULL,
+  population INT DEFAULT NULL,
+  households INT DEFAULT NULL,
+  booths INT DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS constituency_profiles (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  constituency_name VARCHAR(255) DEFAULT NULL,
+  state VARCHAR(100) DEFAULT NULL,
+  total_voters INT DEFAULT NULL,
+  male_voters INT DEFAULT NULL,
+  female_voters INT DEFAULT NULL,
+  rural_percent DECIMAL(5,2) DEFAULT NULL,
+  urban_percent DECIMAL(5,2) DEFAULT NULL,
+  literacy_rate DECIMAL(5,2) DEFAULT NULL,
+  sex_ratio INT DEFAULT NULL,
+  demographics JSON,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS caste_demographics (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  caste_name VARCHAR(100) DEFAULT NULL,
+  percentage DECIMAL(5,2) DEFAULT NULL,
+  population INT DEFAULT NULL,
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS mandal_stats (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  mandal_name VARCHAR(100) DEFAULT NULL,
+  total_villages INT DEFAULT NULL,
+  total_voters INT DEFAULT NULL,
+  booths INT DEFAULT NULL,
+  key_issues JSON,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS projects (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  project_name VARCHAR(255) DEFAULT NULL,
+  location VARCHAR(255) DEFAULT NULL,
+  mandal VARCHAR(100) DEFAULT NULL,
+  contractor VARCHAR(255) DEFAULT NULL,
+  status VARCHAR(50) DEFAULT 'Planning',
+  budget_allocated DECIMAL(15,2) DEFAULT NULL,
+  budget_spent DECIMAL(15,2) DEFAULT NULL,
+  progress_percent INT DEFAULT 0,
+  expected_completion DATE DEFAULT NULL,
+  description TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS media_mentions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  headline VARCHAR(500) DEFAULT NULL,
+  source VARCHAR(100) DEFAULT NULL,
+  summary TEXT,
+  sentiment ENUM('positive','negative','neutral') DEFAULT 'neutral',
+  url TEXT,
+  published_at DATETIME DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id),
+  INDEX idx_published (published_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS finances (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  category VARCHAR(100) DEFAULT NULL,
+  description TEXT,
+  amount DECIMAL(12,2) DEFAULT NULL,
+  transaction_date DATE DEFAULT NULL,
+  payment_method VARCHAR(50) DEFAULT NULL,
+  status VARCHAR(50) DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS finance_compliance_reports (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  report_type VARCHAR(50) DEFAULT NULL,
+  status VARCHAR(50) DEFAULT NULL,
+  period VARCHAR(50) DEFAULT NULL,
+  amount DECIMAL(12,2) DEFAULT NULL,
+  notes TEXT,
+  filed_by INT DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS communications (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  subject VARCHAR(255) DEFAULT NULL,
+  message TEXT,
+  channel VARCHAR(50) DEFAULT NULL,
+  recipients TEXT,
+  sent_at DATETIME DEFAULT NULL,
+  status VARCHAR(50) DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS comm_templates (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  name VARCHAR(255) DEFAULT NULL,
+  channel VARCHAR(50) DEFAULT NULL,
+  subject VARCHAR(255) DEFAULT NULL,
+  body TEXT,
+  variables JSON,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS documents (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  title VARCHAR(255) DEFAULT NULL,
+  category VARCHAR(100) DEFAULT NULL,
+  file_url TEXT,
+  file_type VARCHAR(50) DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS appointments (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  visitor_name VARCHAR(255) DEFAULT NULL,
+  purpose TEXT,
+  category VARCHAR(100) DEFAULT NULL,
+  appointment_date DATETIME DEFAULT NULL,
+  phone VARCHAR(50) DEFAULT NULL,
+  notes TEXT,
+  status VARCHAR(50) DEFAULT 'Pending',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS polls (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  title VARCHAR(255) DEFAULT NULL,
+  category VARCHAR(100) DEFAULT NULL,
+  question TEXT,
+  options JSON,
+  status VARCHAR(50) DEFAULT 'Draft',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS poll_responses (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  poll_id INT DEFAULT NULL,
+  voter_id VARCHAR(100) DEFAULT NULL,
+  response TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_poll (poll_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS bills (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  bill_name VARCHAR(255) DEFAULT NULL,
+  bill_number VARCHAR(100) DEFAULT NULL,
+  ministry VARCHAR(100) DEFAULT NULL,
+  status VARCHAR(50) DEFAULT NULL,
+  introduced_date DATE DEFAULT NULL,
+  summary TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS parliamentary_questions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  subject VARCHAR(255) DEFAULT NULL,
+  ministry VARCHAR(100) DEFAULT NULL,
+  session_number VARCHAR(50) DEFAULT NULL,
+  question_type VARCHAR(50) DEFAULT NULL,
+  content TEXT,
+  status VARCHAR(50) DEFAULT 'Draft',
+  asked_date DATE DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS parliamentary_debates (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  topic VARCHAR(255) DEFAULT NULL,
+  session_number VARCHAR(50) DEFAULT NULL,
+  debate_date DATE DEFAULT NULL,
+  notes TEXT,
+  status VARCHAR(50) DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS parliamentary_bills (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  bill_name VARCHAR(255) DEFAULT NULL,
+  bill_number VARCHAR(100) DEFAULT NULL,
+  ministry VARCHAR(100) DEFAULT NULL,
+  status VARCHAR(50) DEFAULT NULL,
+  introduced_date DATE DEFAULT NULL,
+  summary TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS mplads_tracker (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  scheme_name VARCHAR(255) DEFAULT NULL,
+  location VARCHAR(255) DEFAULT NULL,
+  mandal VARCHAR(100) DEFAULT NULL,
+  status VARCHAR(50) DEFAULT NULL,
+  amount_allocated DECIMAL(15,2) DEFAULT NULL,
+  amount_spent DECIMAL(15,2) DEFAULT NULL,
+  completion_percent INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS citizen_engagements (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  title VARCHAR(255) DEFAULT NULL,
+  location VARCHAR(255) DEFAULT NULL,
+  mandal VARCHAR(100) DEFAULT NULL,
+  engagement_type VARCHAR(100) DEFAULT NULL,
+  event_date DATETIME DEFAULT NULL,
+  attendees INT DEFAULT NULL,
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS volunteers (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  name VARCHAR(255) DEFAULT NULL,
+  phone VARCHAR(50) DEFAULT NULL,
+  mandal VARCHAR(100) DEFAULT NULL,
+  village VARCHAR(100) DEFAULT NULL,
+  role VARCHAR(100) DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS suggestions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  title VARCHAR(255) DEFAULT NULL,
+  category VARCHAR(100) DEFAULT NULL,
+  description TEXT,
+  status VARCHAR(50) DEFAULT 'Open',
+  submitted_by VARCHAR(255) DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Temple / Darshan module
+CREATE TABLE IF NOT EXISTS temple_registry (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  temple_name VARCHAR(255) DEFAULT NULL,
+  location VARCHAR(255) DEFAULT NULL,
+  state VARCHAR(100) DEFAULT NULL,
+  deity VARCHAR(100) DEFAULT NULL,
+  contact_phone VARCHAR(50) DEFAULT NULL,
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS darshan_bookings (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  pilgrim_name VARCHAR(255) DEFAULT NULL,
+  pilgrim_contact VARCHAR(50) DEFAULT NULL,
+  darshan_date DATE DEFAULT NULL,
+  darshan_type VARCHAR(100) DEFAULT NULL,
+  status VARCHAR(50) DEFAULT 'Pending',
+  notes TEXT,
+  approval_status VARCHAR(50) DEFAULT NULL,
+  approved_at DATETIME DEFAULT NULL,
+  approved_by VARCHAR(255) DEFAULT NULL,
+  approval_notes TEXT,
+  contact_person VARCHAR(255) DEFAULT NULL,
+  contact_phone VARCHAR(50) DEFAULT NULL,
+  ticket_pickup_point VARCHAR(255) DEFAULT NULL,
+  shrine_contact_numbers VARCHAR(255) DEFAULT NULL,
+  sms_sent TINYINT(1) DEFAULT 0,
+  sms_sent_at DATETIME DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS darshan_date_slots (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  date DATE DEFAULT NULL,
+  slot VARCHAR(100) DEFAULT NULL,
+  quota INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS darshan_donations (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  donor_name VARCHAR(255) DEFAULT NULL,
+  amount DECIMAL(12,2) DEFAULT NULL,
+  donation_date DATE DEFAULT NULL,
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS darshan_slots (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  temple_id INT DEFAULT NULL,
+  slot_date DATE DEFAULT NULL,
+  slot_time TIME DEFAULT NULL,
+  quota INT DEFAULT 0,
+  booked INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_temple_date (temple_id, slot_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS darshan_quotas (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  temple_id INT DEFAULT NULL,
+  quota_date DATE DEFAULT NULL,
+  quota_total INT DEFAULT 0,
+  quota_used INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_temple_date (temple_id, quota_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS darshan_waiting_list (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  temple_id INT DEFAULT NULL,
+  pilgrim_name VARCHAR(255) DEFAULT NULL,
+  pilgrim_contact VARCHAR(50) DEFAULT NULL,
+  requested_date DATE DEFAULT NULL,
+  status VARCHAR(50) DEFAULT 'Waiting',
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS darshan_requests (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  temple_id INT DEFAULT NULL,
+  pilgrim_name VARCHAR(255) DEFAULT NULL,
+  pilgrim_contact VARCHAR(50) DEFAULT NULL,
+  darshan_date DATE DEFAULT NULL,
+  darshan_type VARCHAR(100) DEFAULT NULL,
+  status VARCHAR(50) DEFAULT 'Pending',
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS darshans (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  pilgrim_name VARCHAR(255) DEFAULT NULL,
+  temple_name VARCHAR(255) DEFAULT NULL,
+  darshan_date DATE DEFAULT NULL,
+  status VARCHAR(50) DEFAULT 'Pending',
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Intelligence / future-lab tables
+CREATE TABLE IF NOT EXISTS ai_briefings (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  title VARCHAR(255) DEFAULT NULL,
+  briefing_type VARCHAR(100) DEFAULT NULL,
+  content TEXT,
+  summary TEXT,
+  status VARCHAR(50) DEFAULT 'generated',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS ai_generated_content (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  content_type VARCHAR(100) DEFAULT NULL,
+  prompt TEXT,
+  content LONGTEXT,
+  is_saved TINYINT(1) DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS sentiment_scores (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  overall_score INT DEFAULT NULL,
+  score_date DATE DEFAULT NULL,
+  source VARCHAR(100) DEFAULT NULL,
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_pol_date_source (politician_id, score_date, source),
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS opposition_intelligence (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  opponent_name VARCHAR(255) DEFAULT NULL,
+  activity_type VARCHAR(100) DEFAULT NULL,
+  description TEXT,
+  platform VARCHAR(100) DEFAULT NULL,
+  threat_level INT DEFAULT 0,
+  detected_at DATETIME DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS voice_reports (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  reporter_name VARCHAR(255) DEFAULT NULL,
+  reporter_role VARCHAR(100) DEFAULT NULL,
+  transcript TEXT,
+  classification VARCHAR(100) DEFAULT NULL,
+  language VARCHAR(50) DEFAULT NULL,
+  location VARCHAR(255) DEFAULT NULL,
+  gps_lat DECIMAL(10,8) DEFAULT NULL,
+  gps_lng DECIMAL(11,8) DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS whatsapp_intelligence (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  sender_phone VARCHAR(50) DEFAULT NULL,
+  classification VARCHAR(100) DEFAULT NULL,
+  content TEXT,
+  sentiment VARCHAR(50) DEFAULT NULL,
+  urgency_score INT DEFAULT 0,
+  is_viral TINYINT(1) DEFAULT 0,
+  is_misinformation TINYINT(1) DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS promises (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  promise_text TEXT,
+  category VARCHAR(100) DEFAULT NULL,
+  status VARCHAR(50) DEFAULT 'Pending',
+  due_date DATE DEFAULT NULL,
+  delivered_at DATETIME DEFAULT NULL,
+  source VARCHAR(255) DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS predictive_alerts (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  alert_type VARCHAR(100) DEFAULT NULL,
+  description TEXT,
+  status VARCHAR(50) DEFAULT 'Open',
+  severity INT DEFAULT 0,
+  detected_at DATETIME DEFAULT NULL,
+  resolved_at DATETIME DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS agent_tasks (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  agent_type VARCHAR(100) DEFAULT NULL,
+  task_type VARCHAR(100) DEFAULT NULL,
+  status VARCHAR(50) DEFAULT 'Pending',
+  payload JSON,
+  result TEXT,
+  started_at DATETIME DEFAULT NULL,
+  completed_at DATETIME DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS deepfake_incidents (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  platform VARCHAR(100) DEFAULT NULL,
+  content_url TEXT,
+  status VARCHAR(50) DEFAULT 'Open',
+  threat_level INT DEFAULT 0,
+  detected_at DATETIME DEFAULT NULL,
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS relationships (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  entity_name VARCHAR(255) DEFAULT NULL,
+  entity_type VARCHAR(100) DEFAULT NULL,
+  relationship_type VARCHAR(100) DEFAULT NULL,
+  influence_score INT DEFAULT 0,
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS economic_indicators (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  indicator_type VARCHAR(100) DEFAULT NULL,
+  mandal VARCHAR(100) DEFAULT NULL,
+  value DECIMAL(10,2) DEFAULT NULL,
+  period VARCHAR(50) DEFAULT NULL,
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS citizen_service_requests (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  requester_name VARCHAR(255) DEFAULT NULL,
+  request_type VARCHAR(100) DEFAULT NULL,
+  status VARCHAR(50) DEFAULT 'Open',
+  description TEXT,
+  location VARCHAR(255) DEFAULT NULL,
+  assigned_to INT DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS election_updates (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  update_type VARCHAR(100) DEFAULT NULL,
+  status VARCHAR(50) DEFAULT NULL,
+  description TEXT,
+  source VARCHAR(255) DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS party_integrations (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  party_name VARCHAR(100) DEFAULT NULL,
+  integration_type VARCHAR(100) DEFAULT NULL,
+  config JSON,
+  status VARCHAR(50) DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS digital_twin_runs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  scenario_name VARCHAR(255) DEFAULT NULL,
+  status VARCHAR(50) DEFAULT NULL,
+  parameters JSON,
+  output TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS coalition_scenarios (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  scenario_name VARCHAR(255) DEFAULT NULL,
+  status VARCHAR(50) DEFAULT NULL,
+  parties JSON,
+  seats_projection JSON,
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS crisis_incidents (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  title VARCHAR(255) DEFAULT NULL,
+  crisis_type VARCHAR(100) DEFAULT NULL,
+  status VARCHAR(50) DEFAULT 'Open',
+  severity INT DEFAULT 0,
+  description TEXT,
+  detected_at DATETIME DEFAULT NULL,
+  resolved_at DATETIME DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS warroom_actions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  action_type VARCHAR(100) DEFAULT NULL,
+  status VARCHAR(50) DEFAULT 'Pending',
+  owner VARCHAR(255) DEFAULT NULL,
+  description TEXT,
+  due_at DATETIME DEFAULT NULL,
+  completed_at DATETIME DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS politician_metrics (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  politician_id INT NOT NULL,
+  metric_key VARCHAR(100) DEFAULT NULL,
+  metric_value DECIMAL(15,4) DEFAULT NULL,
+  recorded_at DATETIME DEFAULT NULL,
+  INDEX idx_politician (politician_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+SET FOREIGN_KEY_CHECKS = 1;

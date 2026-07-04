@@ -82,6 +82,12 @@ import {
   deactivatePoliticianApiKey,
 } from './services/secretStore.js';
 import { aiComplete, aiChat, aiJSON, aiStream } from './services/ai.js';
+import {
+  buildContextualSystem,
+  saveAiFeedback,
+  getContextSummary,
+  clearContextCache,
+} from './services/aiContext.js';
 
 const app = express();
 // Make pool available to all route files via req.app.locals.pool
