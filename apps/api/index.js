@@ -734,6 +734,125 @@ app.use('/api/voters',                 crud('voters',                 ['name','v
 app.use('/api/projects',              crud('projects',               ['project_name','location','mandal','contractor']));
 app.use('/api/media_mentions',         crud('media_mentions',         ['headline','source','summary']));
 
+    // ── Unified Command Dashboard ──
+    app.get('/api/dashboard/command', authMiddleware, async (req, res) => {
+      try {
+        const { politician_id } = req.user;
+        const today = new Date().toISOString().slice(0, 10);
+
+        // Grievances
+        const [[grievanceStats]] = await pool.query(`
+          SELECT
+            COUNT(*) as total,
+            SUM(status IN ('Pending','Open','In Progress')) as pending,
+            SUM(priority = 'Urgent' AND status != 'Resolved') as urgent
+          FROM grievances WHERE politician_id = ?`, [politician_id]);
+
+        // Media mentions (24h)
+        const [[mediaStats]] = await pool.query(`
+          SELECT
+            COUNT(*) as total,
+            SUM(sentiment = 'Negative') as negative,
+            SUM(sentiment = 'Positive') as positive
+          FROM media_mentions
+          WHERE politician_id = ? AND published_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)`, [politician_id]);
+
+        // Today's events
+        const [eventsToday] = await pool.query(`
+          SELECT id, title, location, start_date, TIME(start_date) as start_time
+          FROM events WHERE politician_id = ? AND DATE(start_date) = ?
+          ORDER BY start_date ASC LIMIT 5`, [politician_id, today]);
+
+        // Today's appointments
+        const [appointmentsToday] = await pool.query(`
+          SELECT id, visitor_name as title, purpose as location, appointment_date, TIME(appointment_date) as appointment_time
+          FROM appointments WHERE politician_id = ? AND DATE(appointment_date) = ?
+          ORDER BY appointment_date ASC LIMIT 5`, [politician_id, today]);
+
+        // Projects
+        const [[projectStats]] = await pool.query(`
+          SELECT
+            COUNT(*) as total,
+            SUM(status IN ('In Progress','Stalled')) as active,
+            SUM(status = 'Stalled') as stalled
+          FROM projects WHERE politician_id = ?`, [politician_id]);
+
+        // WhatsApp intelligence (24h)
+        const [[whatsappStats]] = await pool.query(`
+          SELECT
+            COUNT(*) as total,
+            SUM(urgency_score >= 8) as urgent
+          FROM whatsapp_intelligence
+          WHERE politician_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)`, [politician_id]);
+
+        // Booth stats
+        const [[boothStats]] = await pool.query(`
+          SELECT
+            COUNT(*) as total,
+            SUM(sensitive_level = 'High') as high_sensitive,
+            SUM(sensitive_level = 'Medium') as medium_sensitive
+          FROM booths WHERE politician_id = ?`, [politician_id]);
+
+        // Darshan bookings today
+        const [[darshanStats]] = await pool.query(`
+          SELECT COUNT(*) as total
+          FROM darshan_bookings
+          WHERE politician_id = ? AND DATE(created_at) = ? AND status != 'rejected'`, [politician_id, today]);
+
+        // Latest media mentions
+        const [latestMentions] = await pool.query(`
+          SELECT id, headline, source, sentiment, published_at, url
+          FROM media_mentions
+          WHERE politician_id = ?
+          ORDER BY published_at DESC LIMIT 5`, [politician_id]);
+
+        // Pending approvals (darshan)
+        const [[approvalStats]] = await pool.query(`
+          SELECT COUNT(*) as pending
+          FROM darshan_bookings
+          WHERE politician_id = ? AND status = 'pending'`, [politician_id]);
+
+        res.json({
+          grievances: {
+            total: grievanceStats.total || 0,
+            pending: grievanceStats.pending || 0,
+            urgent: grievanceStats.urgent || 0,
+          },
+          media: {
+            total_24h: mediaStats.total || 0,
+            negative_24h: mediaStats.negative || 0,
+            positive_24h: mediaStats.positive || 0,
+          },
+          projects: {
+            total: projectStats.total || 0,
+            active: projectStats.active || 0,
+            stalled: projectStats.stalled || 0,
+          },
+          whatsapp: {
+            total_24h: whatsappStats.total || 0,
+            urgent_24h: whatsappStats.urgent || 0,
+          },
+          booths: {
+            total: boothStats.total || 0,
+            high_sensitive: boothStats.high_sensitive || 0,
+            medium_sensitive: boothStats.medium_sensitive || 0,
+          },
+          darshan: {
+            today: darshanStats.total || 0,
+            pending_approvals: approvalStats.pending || 0,
+          },
+          today: {
+            events: eventsToday,
+            appointments: appointmentsToday,
+          },
+          latest_mentions: latestMentions,
+        });
+      } catch (error) {
+        console.error('[dashboard/command] Error:', error);
+        res.status(500).json({ error: 'Failed to load command dashboard' });
+      }
+    });
+
     // ── RSS Feed Management + OmniScan ──
     app.get('/api/rss-feeds', authMiddleware, async (req, res) => {
       try {

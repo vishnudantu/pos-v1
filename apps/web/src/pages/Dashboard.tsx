@@ -1,195 +1,263 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
+import {
+  MessageSquare, Calendar, Users, AlertCircle, Megaphone, Clock, MapPin,
+  Zap, TrendingUp, RefreshCw, ArrowRight, ShieldAlert, Radio, Vote,
+  Star, Phone, CheckCircle2, XCircle, AlertTriangle, Newspaper
+} from 'lucide-react';
 import { useAuth } from '../lib/auth';
-import { MessageSquare, Calendar, TrendingUp, Users, AlertCircle, Megaphone, Clock, MapPin, ChevronRight, Zap } from 'lucide-react';
+import { api } from '../lib/api';
 
-interface StatCard {
-  icon: any;
-  label: string;
-  value: string | number;
-  trend?: string;
-  gradient: string;
+const C = {
+  panel: 'rgba(255,255,255,0.04)',
+  border: 'rgba(255,255,255,0.08)',
+  text: '#f0f4ff',
+  muted: '#8899bb',
+  accent: '#00d4aa',
+  accent2: '#1e88e5',
+  error: '#ff5555',
+  warning: '#ffa726',
+  success: '#00c864',
+  info: '#64b5f6',
+};
+
+const tokens = {
+  panel: { background: C.panel, border: `1px solid ${C.border}`, borderRadius: 18, padding: 20 } as React.CSSProperties,
+  label: { fontSize: 10, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8 } as React.CSSProperties,
+  btnPrimary: { background: 'linear-gradient(135deg, #00d4aa, #1e88e5)', border: 'none', borderRadius: 10, padding: '10px 16px', color: '#060b18', fontWeight: 800, fontSize: 12, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 } as React.CSSProperties,
+};
+
+interface CommandData {
+  grievances: { total: number; pending: number; urgent: number };
+  media: { total_24h: number; negative_24h: number; positive_24h: number };
+  projects: { total: number; active: number; stalled: number };
+  whatsapp: { total_24h: number; urgent_24h: number };
+  booths: { total: number; avg_strength: number; weak: number };
+  darshan: { today: number; pending_approvals: number };
+  today: {
+    events: { id: number; title: string; location: string; start_date: string; start_time: string }[];
+    appointments: { id: number; title: string; location: string; appointment_date: string; appointment_time: string }[];
+  };
+  latest_mentions: { id: number; headline: string; source: string; sentiment: string; published_at: string; url: string }[];
 }
 
 export default function Dashboard() {
-  const { activePolitician } = useAuth();
+  const { activePolitician, user } = useAuth();
+  const [data, setData] = useState<CommandData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<StatCard[]>([]);
+  const [error, setError] = useState('');
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const res = await api.get('/api/dashboard/command');
+      setData(res);
+    } catch (e: any) {
+      setError(e.message || 'Failed to load dashboard');
+    }
+    setLoading(false);
+  };
+
   useEffect(() => {
-    setTimeout(() => {
-      setStats([
-        { icon: MessageSquare, label: 'Pending Grievances', value: 12, trend: '+3 today', gradient: 'from-orange-500 to-red-500' },
-        { icon: Calendar, label: "Today's Events", value: 4, trend: '2 upcoming', gradient: 'from-blue-500 to-cyan-500' },
-        { icon: TrendingUp, label: 'Approval Rating', value: '78%', trend: '+5% this month', gradient: 'from-emerald-500 to-green-500' },
-        { icon: Users, label: 'Constituents Reached', value: '2.4K', trend: '+12% this week', gradient: 'from-purple-500 to-pink-500' },
-      ]);
-      setLoading(false);
-    }, 1000);
+    fetchData();
+    const t = setInterval(fetchData, 60000); // refresh every minute
+    return () => clearInterval(t);
   }, []);
 
-  if (loading) {
+  if (loading && !data) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-brand-500/30 border-t-brand-500 rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-white/60">Loading your dashboard...</p>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ width: 48, height: 48, border: '3px solid rgba(0,212,170,0.2)', borderTopColor: C.accent, borderRadius: '50%', margin: '0 auto 16px', animation: 'spin 1s linear infinite' }} />
+          <p style={{ color: C.muted, fontSize: 13 }}>Loading command dashboard...</p>
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen pb-24">
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-dark-100/80 backdrop-blur-xl border-b border-white/5">
-        <div className="px-6 py-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <p className="text-white/50 mb-1">{greeting}</p>
-              <h1 className="text-3xl font-bold text-white">
-                {activePolitician?.display_name || activePolitician?.full_name || 'Dashboard'}
-              </h1>
-              <p className="text-white/40 mt-1">{activePolitician?.designation} • {activePolitician?.constituency_name}</p>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="text-right hidden sm:block">
-                <p className="text-white font-semibold">{activePolitician?.full_name?.split(' ').map(n => n[0]).join('') || 'U'}</p>
-                <p className="text-white/40 text-sm">Online</p>
-              </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-500 to-accent-500 flex items-center justify-center text-white text-xl font-bold shadow-lg shadow-brand-500/30">
-                {activePolitician?.full_name?.charAt(0) || 'U'}
-              </div>
-            </div>
-          </div>
+  const d = data || {
+    grievances: { total: 0, pending: 0, urgent: 0 },
+    media: { total_24h: 0, negative_24h: 0, positive_24h: 0 },
+    projects: { total: 0, active: 0, stalled: 0 },
+    whatsapp: { total_24h: 0, urgent_24h: 0 },
+    booths: { total: 0, avg_strength: 0, weak: 0 },
+    darshan: { today: 0, pending_approvals: 0 },
+    today: { events: [], appointments: [] },
+    latest_mentions: [],
+  };
 
-          {/* Quick Actions */}
-          <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
-            {['📊 View Reports', '📝 New Grievance', '📅 Schedule', '📢 Broadcast'].map((action, i) => (
-              <motion.button
-                key={i}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="flex-shrink-0 px-5 py-3 rounded-2xl bg-white/5 border border-white/10 text-white hover:bg-white/10 hover:border-brand-500/50 transition-all"
-              >
-                {action}
-              </motion.button>
-            ))}
+  return (
+    <div style={{ color: C.text, minHeight: '100vh', paddingBottom: 40 }}>
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+
+      {/* Header */}
+      <div style={{ ...tokens.panel, marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+        <div>
+          <div style={{ fontSize: 12, color: C.muted, marginBottom: 4 }}>{greeting}</div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: C.text }}>
+            {activePolitician?.display_name || activePolitician?.full_name || 'Dashboard'}
+          </div>
+          <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>
+            {activePolitician?.designation} • {activePolitician?.constituency_name} {activePolitician?.state ? `, ${activePolitician.state}` : ''}
           </div>
         </div>
-      </header>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button onClick={fetchData} disabled={loading} style={{ ...tokens.btnPrimary, opacity: loading ? 0.6 : 1 }}>
+            {loading ? <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <RefreshCw size={14} />} Refresh
+          </button>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg, #00d4aa, #1e88e5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#060b18', fontSize: 16 }}>
+            {(activePolitician?.full_name?.[0] || user?.email?.[0] || 'U').toUpperCase()}
+          </div>
+        </div>
+      </div>
 
-      {/* Main Content */}
-      <main className="px-6 py-8 space-y-8">
-        {/* Stats Grid */}
-        <section>
-          <h2 className="text-xl font-semibold text-white mb-4">Quick Stats</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {stats.map((stat, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.1 }}
-                whileHover={{ y: -4 }}
-                className="glass-card p-6"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${stat.gradient} flex items-center justify-center shadow-lg`}>
-                    <stat.icon className="text-white" size={24} />
+      {error && (
+        <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(255,85,85,0.1)', border: '1px solid rgba(255,85,85,0.2)', color: C.error, fontSize: 12, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <AlertTriangle size={14} /> {error}
+        </div>
+      )}
+
+      {/* Top stats grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14, marginBottom: 16 }}>
+        <StatCard icon={MessageSquare} label="Pending Grievances" value={d.grievances.pending} sub={d.grievances.urgent > 0 ? `${d.grievances.urgent} urgent` : undefined} color={C.warning} />
+        <StatCard icon={Megaphone} label="Media Mentions (24h)" value={d.media.total_24h} sub={d.media.negative_24h > 0 ? `${d.media.negative_24h} negative` : `${d.media.positive_24h} positive`} color={C.info} />
+        <StatCard icon={TrendingUp} label="Active Projects" value={d.projects.active} sub={d.projects.stalled > 0 ? `${d.projects.stalled} stalled` : undefined} color={C.success} />
+        <StatCard icon={Vote} label="Sensitive Booths" value={d.booths.high_sensitive} sub={d.booths.medium_sensitive > 0 ? `${d.booths.medium_sensitive} medium` : undefined} color={C.accent2} />
+        <StatCard icon={Phone} label="WhatsApp (24h)" value={d.whatsapp.total_24h} sub={d.whatsapp.urgent_24h > 0 ? `${d.whatsapp.urgent_24h} urgent` : undefined} color="#ab47bc" />
+        <StatCard icon={Star} label="Darshan Today" value={d.darshan.today} sub={d.darshan.pending_approvals > 0 ? `${d.darshan.pending_approvals} pending` : undefined} color="#ff7043" />
+      </div>
+
+      {/* Middle row */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+        {/* Today's schedule */}
+        <div style={tokens.panel}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Calendar size={16} color={C.accent} /> Today's Schedule
+            </div>
+            <span style={{ fontSize: 11, color: C.muted }}>{new Date().toLocaleDateString('en-IN')}</span>
+          </div>
+
+          {d.today.events.length === 0 && d.today.appointments.length === 0 && (
+            <div style={{ textAlign: 'center', padding: 24, color: C.muted, fontSize: 12 }}>No events or appointments today</div>
+          )}
+
+          {[...d.today.events, ...d.today.appointments].slice(0, 5).map((item: any, i) => {
+            const isEvent = 'start_time' in item;
+            return (
+              <motion.div key={item.id || i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}
+                style={{ display: 'flex', gap: 12, padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                <div style={{ width: 42, textAlign: 'center', padding: '6px 0', borderRadius: 8, background: 'rgba(0,212,170,0.08)', color: C.accent, fontSize: 11, fontWeight: 700 }}>
+                  {isEvent ? item.start_time?.slice(0, 5) || 'All day' : item.appointment_time?.slice(0, 5) || 'TBD'}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{item.title}</div>
+                  <div style={{ fontSize: 11, color: C.muted, display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 }}>
+                    <MapPin size={10} /> {item.location || 'Location TBD'}
                   </div>
-                  {stat.trend && (
-                    <span className="text-emerald-400 text-sm font-semibold bg-emerald-500/20 px-3 py-1 rounded-full">
-                      {stat.trend}
-                    </span>
-                  )}
                 </div>
-                <p className="text-3xl font-bold text-white mb-1">{stat.value}</p>
-                <p className="text-white/50 text-sm">{stat.label}</p>
+              </motion.div>
+            );
+          })}
+        </div>
+
+        {/* Priority alerts */}
+        <div style={tokens.panel}>
+          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ShieldAlert size={16} color={C.error} /> Priority Alerts
+          </div>
+
+          {d.grievances.urgent === 0 && d.media.negative_24h === 0 && d.whatsapp.urgent_24h === 0 && d.projects.stalled === 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 16, borderRadius: 12, background: 'rgba(0,200,100,0.06)', border: '1px solid rgba(0,200,100,0.15)' }}>
+              <CheckCircle2 size={20} color={C.success} />
+              <div style={{ fontSize: 13, color: C.text }}>All systems clear. No urgent alerts.</div>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {d.grievances.urgent > 0 && (
+              <AlertRow icon={AlertCircle} color={C.error} title={`${d.grievances.urgent} Urgent Grievance${d.grievances.urgent !== 1 ? 's' : ''}`} subtitle="Require immediate attention" />
+            )}
+            {d.media.negative_24h > 0 && (
+              <AlertRow icon={Newspaper} color={C.warning} title={`${d.media.negative_24h} Negative Mention${d.media.negative_24h !== 1 ? 's' : ''}`} subtitle="In last 24 hours" />
+            )}
+            {d.whatsapp.urgent_24h > 0 && (
+              <AlertRow icon={Phone} color="#ab47bc" title={`${d.whatsapp.urgent_24h} Urgent WhatsApp Message${d.whatsapp.urgent_24h !== 1 ? 's' : ''}`} subtitle="High urgency score" />
+            )}
+            {d.projects.stalled > 0 && (
+              <AlertRow icon={TrendingUp} color={C.info} title={`${d.projects.stalled} Stalled Project${d.projects.stalled !== 1 ? 's' : ''}`} subtitle="Need follow-up" />
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Latest media mentions */}
+      <div style={tokens.panel}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Radio size={16} color={C.accent2} /> Latest Media Mentions
+          </div>
+          <button onClick={() => {}} style={{ fontSize: 11, color: C.accent, fontWeight: 700 }}>View All →</button>
+        </div>
+
+        {d.latest_mentions.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 24, color: C.muted, fontSize: 12 }}>No media mentions yet. Run OmniScan.</div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
+            {d.latest_mentions.map((m, i) => (
+              <motion.div key={m.id || i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
+                style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}`, borderRadius: 12, padding: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: C.accent2 }}>{m.source}</span>
+                  <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, fontWeight: 700,
+                    background: m.sentiment === 'Positive' ? 'rgba(0,200,100,0.15)' : m.sentiment === 'Negative' ? 'rgba(255,85,85,0.15)' : 'rgba(100,181,246,0.15)',
+                    color: m.sentiment === 'Positive' ? C.success : m.sentiment === 'Negative' ? C.error : C.info }}>
+                    {m.sentiment || 'Neutral'}
+                  </span>
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: C.text, lineHeight: 1.4, marginBottom: 8 }}>{m.headline}</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 10, color: C.muted }}>{new Date(m.published_at).toLocaleString('en-IN')}</span>
+                  <a href={m.url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: C.accent2 }}>Read →</a>
+                </div>
               </motion.div>
             ))}
           </div>
-        </section>
+        )}
+      </div>
+    </div>
+  );
+}
 
-        {/* Priority Alerts */}
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-white">Priority Alerts</h2>
-            <button className="text-brand-400 hover:text-brand-300 text-sm font-medium flex items-center gap-1">
-              View All <ChevronRight size={16} />
-            </button>
-          </div>
-          <div className="glass-card p-6 space-y-4">
-            <div className="flex items-start gap-4 p-4 rounded-2xl bg-error/10 border border-error/30">
-              <div className="w-10 h-10 rounded-xl bg-error/30 flex items-center justify-center flex-shrink-0">
-                <AlertCircle className="text-error" size={20} />
-              </div>
-              <div className="flex-1">
-                <p className="text-white font-semibold">3 Urgent Grievances</p>
-                <p className="text-white/50 text-sm">Require immediate attention</p>
-              </div>
-              <ChevronRight className="text-white/30" />
-            </div>
-            <div className="flex items-start gap-4 p-4 rounded-2xl bg-warning/10 border border-warning/30">
-              <div className="w-10 h-10 rounded-xl bg-warning/30 flex items-center justify-center flex-shrink-0">
-                <Megaphone className="text-warning" size={20} />
-              </div>
-              <div className="flex-1">
-                <p className="text-white font-semibold">5 Negative Mentions</p>
-                <p className="text-white/50 text-sm">Last 24 hours</p>
-              </div>
-              <ChevronRight className="text-white/30" />
-            </div>
-          </div>
-        </section>
+function StatCard({ icon: Icon, label, value, sub, color }: { icon: any, label: string, value: string | number, sub?: string, color: string }) {
+  return (
+    <motion.div whileHover={{ y: -3 }} style={{ ...tokens.panel, display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+      <div style={{ width: 48, height: 48, borderRadius: 12, background: `${color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <Icon size={24} color={color} />
+      </div>
+      <div>
+        <div style={{ fontSize: 24, fontWeight: 900, color: C.text }}>{value}</div>
+        <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{label}</div>
+        {sub && <div style={{ fontSize: 10, color, marginTop: 4, fontWeight: 700 }}>{sub}</div>}
+      </div>
+    </motion.div>
+  );
+}
 
-        {/* Today's Schedule */}
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-white">Today's Schedule</h2>
-            <button className="text-brand-400 hover:text-brand-300 text-sm font-medium">Add Event</button>
-          </div>
-          <div className="space-y-3">
-            {[
-              { time: '10:00 AM', title: 'Constituency Meeting', location: 'Office', icon: '🏛️' },
-              { time: '02:00 PM', title: 'Ground Visit', location: 'Booth 45', icon: '📍' },
-              { time: '05:00 PM', title: 'Press Conference', location: 'Media Center', icon: '🎤' },
-            ].map((event, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.1 }}
-                whileHover={{ x: 4 }}
-                className="glass-card p-5 flex items-center gap-4 cursor-pointer"
-              >
-                <div className="text-3xl">{event.icon}</div>
-                <div className="w-1 h-12 rounded-full bg-gradient-to-b from-brand-500 to-accent-500" />
-                <div className="flex-1">
-                  <p className="text-brand-400 font-semibold mb-1">{event.time}</p>
-                  <p className="text-white font-medium">{event.title}</p>
-                  <p className="text-white/40 text-sm flex items-center gap-1">
-                    <MapPin size={12} /> {event.location}
-                  </p>
-                </div>
-                <ChevronRight className="text-white/30" />
-              </motion.div>
-            ))}
-          </div>
-        </section>
-      </main>
-
-      {/* Floating Action Button */}
-      <motion.button
-        className="fixed bottom-24 right-6 w-16 h-16 rounded-3xl bg-gradient-to-br from-brand-500 to-accent-500 text-white shadow-2xl shadow-brand-500/50 flex items-center justify-center z-40"
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.9 }}
-      >
-        <Zap size={28} strokeWidth={2.5} />
-      </motion.button>
+function AlertRow({ icon: Icon, color, title, subtitle }: { icon: any, color: string, title: string, subtitle: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 12, background: `${color}10`, border: `1px solid ${color}30` }}>
+      <div style={{ width: 36, height: 36, borderRadius: 10, background: `${color}20`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Icon size={18} color={color} />
+      </div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{title}</div>
+        <div style={{ fontSize: 11, color: C.muted }}>{subtitle}</div>
+      </div>
+      <ArrowRight size={16} color={color} />
     </div>
   );
 }
