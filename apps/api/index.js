@@ -70,6 +70,7 @@ let warRoomMetrics = async () => ({});
   console.log('[services] All loaded successfully');
 })();
 import darshanRoutes from './routes/darshan.js';
+import { scanAllFeeds } from './services/rssScanner.js';
 import {
   listApiKeys,
   upsertApiKey,
@@ -732,6 +733,246 @@ app.use('/api/team_members',           crud('team_members',           ['name','r
 app.use('/api/voters',                 crud('voters',                 ['name','voter_id','mandal','village','phone']));
 app.use('/api/projects',              crud('projects',               ['project_name','location','mandal','contractor']));
 app.use('/api/media_mentions',         crud('media_mentions',         ['headline','source','summary']));
+
+    // ── RSS Feed Management + OmniScan ──
+    app.get('/api/rss-feeds', authMiddleware, async (req, res) => {
+      try {
+        const { politician_id } = req.user;
+        const [rows] = await pool.query(
+          'SELECT * FROM rss_feeds WHERE politician_id = ? ORDER BY feed_type, feed_name',
+          [politician_id]
+        );
+        res.json({ feeds: rows });
+      } catch (error) {
+        console.error('[rss-feeds GET] Error:', error);
+        res.status(500).json({ error: 'Failed to fetch RSS feeds' });
+      }
+    });
+
+    app.post('/api/rss-feeds', authMiddleware, async (req, res) => {
+      try {
+        const { politician_id } = req.user;
+        const { feed_name, feed_url, feed_type = 'state', language = 'telugu' } = req.body;
+        if (!feed_name || !feed_url) return res.status(400).json({ error: 'Name and URL required' });
+        const [result] = await pool.query(
+          'INSERT INTO rss_feeds (politician_id, feed_name, feed_url, feed_type, language, is_active) VALUES (?, ?, ?, ?, ?, 1)',
+          [politician_id, feed_name.trim(), feed_url.trim(), feed_type, language]
+        );
+        res.status(201).json({ id: result.insertId, feed_name, feed_url, feed_type, language, is_active: 1 });
+      } catch (error) {
+        console.error('[rss-feeds POST] Error:', error);
+        res.status(500).json({ error: 'Failed to add RSS feed' });
+      }
+    });
+
+    app.delete('/api/rss-feeds/:id', authMiddleware, async (req, res) => {
+      try {
+        const { id } = req.params;
+        const { politician_id } = req.user;
+        await pool.query('DELETE FROM rss_feeds WHERE id = ? AND politician_id = ?', [id, politician_id]);
+        res.json({ success: true });
+      } catch (error) {
+        console.error('[rss-feeds DELETE] Error:', error);
+        res.status(500).json({ error: 'Failed to delete RSS feed' });
+      }
+    });
+
+    app.patch('/api/rss-feeds/:id/toggle', authMiddleware, async (req, res) => {
+      try {
+        const { id } = req.params;
+        const { politician_id } = req.user;
+        const { is_active } = req.body;
+        await pool.query(
+          'UPDATE rss_feeds SET is_active = ? WHERE id = ? AND politician_id = ?',
+          [is_active ? 1 : 0, id, politician_id]
+        );
+        res.json({ success: true });
+      } catch (error) {
+        console.error('[rss-feeds toggle] Error:', error);
+        res.status(500).json({ error: 'Failed to toggle RSS feed' });
+      }
+    });
+
+    app.post('/api/omniscan', authMiddleware, async (req, res) => {
+      try {
+        const { politician_id } = req.user;
+        const { feed_type } = req.body;
+        const result = await scanAllFeeds(politician_id, feed_type || null);
+        res.json(result);
+      } catch (error) {
+        console.error('[omniscan] Error:', error);
+        res.status(500).json({ error: error.message || 'Scan failed' });
+      }
+    });
+
+
+    // ── AI Training Center ──
+    // Get all training rules for a politician
+    app.get('/api/ai-training/:politicianId', authMiddleware, async (req, res) => {
+      try {
+        const { politicianId } = req.params;
+        const { politician_id, role } = req.user;
+        if (role !== 'super_admin' && String(politician_id) !== String(politicianId)) {
+          return res.status(403).json({ error: 'Access denied' });
+        }
+        const [rows] = await pool.query(
+          'SELECT * FROM ai_training_rules WHERE politician_id = ? ORDER BY rule_type, created_at DESC',
+          [politicianId]
+        );
+        res.json({ rules: rows });
+      } catch (error) {
+        console.error('[ai-training GET] Error:', error);
+        res.status(500).json({ error: 'Failed to fetch training rules' });
+      }
+    });
+
+    // Add a training rule
+    app.post('/api/ai-training/:politicianId', authMiddleware, async (req, res) => {
+      try {
+        const { politicianId } = req.params;
+        const { politician_id, role } = req.user;
+        if (role !== 'super_admin' && String(politician_id) !== String(politicianId)) {
+          return res.status(403).json({ error: 'Access denied' });
+        }
+        const { rule_type, title, content } = req.body;
+        const validTypes = ['identity', 'style', 'avoid', 'example', 'template'];
+        if (!validTypes.includes(rule_type) || !content || !content.trim()) {
+          return res.status(400).json({ error: 'rule_type and content are required' });
+        }
+        const [result] = await pool.query(
+          'INSERT INTO ai_training_rules (politician_id, rule_type, title, content, is_active) VALUES (?, ?, ?, ?, 1)',
+          [politicianId, rule_type, title || null, content.trim()]
+        );
+        res.status(201).json({ id: result.insertId, politician_id: politicianId, rule_type, title, content: content.trim(), is_active: 1 });
+      } catch (error) {
+        console.error('[ai-training POST] Error:', error);
+        res.status(500).json({ error: 'Failed to create training rule' });
+      }
+    });
+
+    // Update a rule
+    app.put('/api/ai-training/:politicianId/:id', authMiddleware, async (req, res) => {
+      try {
+        const { politicianId, id } = req.params;
+        const { politician_id, role } = req.user;
+        if (role !== 'super_admin' && String(politician_id) !== String(politicianId)) {
+          return res.status(403).json({ error: 'Access denied' });
+        }
+        const { title, content, is_active } = req.body;
+        const updates = [];
+        const params = [];
+        if (title !== undefined) { updates.push('title = ?'); params.push(title); }
+        if (content !== undefined) { updates.push('content = ?'); params.push(content.trim()); }
+        if (is_active !== undefined) { updates.push('is_active = ?'); params.push(is_active ? 1 : 0); }
+        if (updates.length === 0) return res.status(400).json({ error: 'Nothing to update' });
+        params.push(id, politicianId);
+        await pool.query(
+          `UPDATE ai_training_rules SET ${updates.join(', ')} WHERE id = ? AND politician_id = ?`,
+          params
+        );
+        res.json({ success: true });
+      } catch (error) {
+        console.error('[ai-training PUT] Error:', error);
+        res.status(500).json({ error: 'Failed to update training rule' });
+      }
+    });
+
+    // Delete a rule
+    app.delete('/api/ai-training/:politicianId/:id', authMiddleware, async (req, res) => {
+      try {
+        const { politicianId, id } = req.params;
+        const { politician_id, role } = req.user;
+        if (role !== 'super_admin' && String(politician_id) !== String(politicianId)) {
+          return res.status(403).json({ error: 'Access denied' });
+        }
+        await pool.query('DELETE FROM ai_training_rules WHERE id = ? AND politician_id = ?', [id, politicianId]);
+        res.json({ success: true });
+      } catch (error) {
+        console.error('[ai-training DELETE] Error:', error);
+        res.status(500).json({ error: 'Failed to delete training rule' });
+      }
+    });
+
+    // Preview AI output with training rules injected
+    app.post('/api/ai-training/:politicianId/preview', authMiddleware, async (req, res) => {
+      try {
+        const { politicianId } = req.params;
+        const { politician_id, role } = req.user;
+        if (role !== 'super_admin' && String(politician_id) !== String(politicianId)) {
+          return res.status(403).json({ error: 'Access denied' });
+        }
+        const { prompt, endpoint = 'general', maxTokens = 800 } = req.body;
+        if (!prompt || !prompt.trim()) {
+          return res.status(400).json({ error: 'Prompt is required' });
+        }
+        const text = await aiComplete({ prompt: prompt.trim(), system: 'You are writing on behalf of an Indian politician.', politicianId: parseInt(politicianId), endpoint, maxTokens });
+        res.json({ output: text });
+      } catch (error) {
+        console.error('[ai-training preview] Error:', error);
+        res.status(500).json({ error: error.message || 'Failed to preview' });
+      }
+    });
+
+    // Keyword management for media monitoring
+    app.get('/api/keywords', authMiddleware, async (req, res) => {
+      try {
+        const { politician_id } = req.user;
+        const [rows] = await pool.query(
+          'SELECT * FROM keywords WHERE politician_id = ? ORDER BY created_at DESC',
+          [politician_id]
+        );
+        res.json({ keywords: rows });
+      } catch (error) {
+        console.error('[keywords GET] Error:', error);
+        res.status(500).json({ error: 'Failed to fetch keywords' });
+      }
+    });
+
+    app.post('/api/keywords', authMiddleware, async (req, res) => {
+      try {
+        const { politician_id } = req.user;
+        const { keyword, keyword_type = 'politician' } = req.body;
+        if (!keyword || !keyword.trim()) {
+          return res.status(400).json({ error: 'Keyword is required' });
+        }
+        const [result] = await pool.query(
+          'INSERT INTO keywords (politician_id, keyword, keyword_type, is_active) VALUES (?, ?, ?, 1)',
+          [politician_id, keyword.trim(), keyword_type]
+        );
+        res.status(201).json({ id: result.insertId, keyword: keyword.trim(), keyword_type, is_active: 1 });
+      } catch (error) {
+        console.error('[keywords POST] Error:', error);
+        res.status(500).json({ error: 'Failed to add keyword' });
+      }
+    });
+
+    app.delete('/api/keywords/:id', authMiddleware, async (req, res) => {
+      try {
+        const { id } = req.params;
+        const { politician_id } = req.user;
+        await pool.query('DELETE FROM keywords WHERE id = ? AND politician_id = ?', [id, politician_id]);
+        res.json({ success: true });
+      } catch (error) {
+        console.error('[keywords DELETE] Error:', error);
+        res.status(500).json({ error: 'Failed to delete keyword' });
+      }
+    });
+
+    app.patch('/api/keywords/:id/toggle', authMiddleware, async (req, res) => {
+      try {
+        const { id } = req.params;
+        const { politician_id } = req.user;
+        const { is_active } = req.body;
+        await pool.query(
+          'UPDATE keywords SET is_active = ? WHERE id = ? AND politician_id = ?',
+          [is_active ? 1 : 0, id, politician_id]
+        );
+        res.json({ success: true });
+      } catch (error) {
+        console.error('[keywords toggle] Error:', error);
+        res.status(500).json({ error: 'Failed to toggle keyword' });
+      }
+    });
 app.use('/api/finances',              crud('finances',               ['category','description']));
 app.use('/api/communications',        crud('communications',         ['subject','message']));
 app.use('/api/documents',             crud('documents',              ['title','category']));

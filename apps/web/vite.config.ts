@@ -14,6 +14,11 @@ export default defineConfig(({ mode }) => {
         '/api': { target: 'http://localhost:3001', changeOrigin: true },
       },
     },
+    preview: {
+      host: '0.0.0.0',
+      port: 4173,
+      allowedHosts: ['thoughtfirst.in', 'www.thoughtfirst.in', 'localhost', '127.0.0.1'],
+    },
     build: {
       outDir: 'dist',
       emptyOutDir: true,

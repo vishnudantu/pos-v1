@@ -91,6 +91,36 @@ function formatContextBlock(rows, heading) {
  * Main function: build the full injected system prompt for a politician
  * Returns enriched system string with platform + party + politician context
  */
+
+// Get politician identity facts
+async function getPoliticianIdentity(politicianId) {
+  if (!politicianId) return null;
+  try {
+    const [[row]] = await pool.query(
+      `SELECT full_name, display_name, designation, constituency_name, district, state, party
+       FROM politician_profiles WHERE id = ? LIMIT 1`,
+      [politicianId]
+    );
+    return row || null;
+  } catch (_) { return null; }
+}
+
+
+// Get politician-specific AI training rules
+async function getTrainingRules(politicianId) {
+  if (!politicianId) return [];
+  try {
+    const [rows] = await pool.query(
+      `SELECT rule_type, title, content
+       FROM ai_training_rules
+       WHERE politician_id = ? AND is_active = 1
+       ORDER BY rule_type, created_at DESC`,
+      [politicianId]
+    );
+    return rows || [];
+  } catch (_) { return []; }
+}
+
 export async function buildContextualSystem(baseSystem, politicianId, endpoint = 'general') {
   try {
     // Fetch all three layers in parallel
@@ -107,6 +137,49 @@ export async function buildContextualSystem(baseSystem, politicianId, endpoint =
     ]);
 
     let system = baseSystem || 'You are a helpful political intelligence assistant for an Indian politician.';
+
+    // Inject hard identity facts from politician profile
+    const identity = await getPoliticianIdentity(politicianId);
+    if (identity && identity.full_name) {
+      const displayName = identity.display_name || identity.full_name;
+      system += `\n\n--- STRICT IDENTITY ---\n`;
+      system += `You are assisting: ${displayName}`;
+      if (identity.designation) system += `, ${identity.designation}`;
+      if (identity.constituency_name) system += ` from ${identity.constituency_name}`;
+      if (identity.district) system += `, ${identity.district}`;
+      if (identity.state) system += `, ${identity.state}`;
+      if (identity.party) system += ` (${identity.party})`;
+      system += `.`;
+      system += `\nCRITICAL: Always refer to this person by their exact registered name: \\"${displayName}\\". Do not change, shorten, anglicize, or re-spell the name.`;
+    }
+
+    // Inject AI training rules
+    const trainingRules = await getTrainingRules(politicianId);
+    if (trainingRules.length > 0) {
+      const byType = {};
+      for (const r of trainingRules) {
+        if (!byType[r.rule_type]) byType[r.rule_type] = [];
+        byType[r.rule_type].push(r);
+      }
+      if (byType.identity?.length) {
+        system += formatContextBlock(byType.identity, 'POLITICIAN TRAINING: IDENTITY');
+      }
+      if (byType.style?.length) {
+        system += formatContextBlock(byType.style, 'POLITICIAN TRAINING: STYLE');
+      }
+      if (byType.avoid?.length) {
+        system += `\n\n--- POLITICIAN TRAINING: AVOID ---\n`;
+        for (const r of byType.avoid) {
+          system += `- ${r.content}\n`;
+        }
+      }
+      if (byType.example?.length) {
+        system += formatContextBlock(byType.example, 'POLITICIAN TRAINING: EXAMPLES TO MATCH');
+      }
+      if (byType.template?.length) {
+        system += formatContextBlock(byType.template, 'POLITICIAN TRAINING: TEMPLATES');
+      }
+    }
 
     // Layer 1: Platform context
     if (platformRows.length) {

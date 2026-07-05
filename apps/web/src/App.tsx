@@ -21,6 +21,7 @@ import Appointments from './pages/Appointments';
 import Polls from './pages/Polls';
 import Darshan from './pages/Darshan';
 import Darshans from './pages/Darshans';
+import AITraining from './pages/AITraining';
 import Legislative from './pages/Legislative';
 import CitizenEngagement from './pages/CitizenEngagement';
 import Profile from './pages/Profile';
@@ -126,6 +127,7 @@ function AppContent() {
       case 'booths': return <BoothManagement />;
       case 'darshan': return <Darshan />;
       case 'darshans': return <Darshans />;
+      case 'ai-training': return <AITraining />;
       case 'legislative': return <Legislative />;
       case 'citizen': return <CitizenEngagement />;
       case 'profile': return <Profile />;

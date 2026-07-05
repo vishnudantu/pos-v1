@@ -5,7 +5,7 @@ import {
   LayoutDashboard, FileText, Calendar, Users, Newspaper, TrendingUp, FolderOpen,
   MessageSquare, Map, BarChart3, Settings, Wallet, UserCheck, Zap,
   CalendarCheck, PieChart, Star, Scale, Megaphone,
-  Building2, Sparkles, LogOut, ChevronDown, Shield, Check, BrainCircuit, Activity, Clock, Eye, Mic,
+  Building2, Sparkles, LogOut, ChevronDown, Shield, Check, BrainCircuit, Brain, Activity, Clock, Eye, Mic,
   Box, Flag, MessageCircleWarning, Radar, Bot, ShieldAlert, Network, LineChart, Handshake, FileCheck2,
   Users2, Cpu, Target, Globe, AlertTriangle, X, Pin, History, Search
 } from 'lucide-react';
@@ -26,6 +26,7 @@ interface NavItem {
 const ALL_ITEMS: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', shortLabel: 'Dashboard', icon: LayoutDashboard, moduleKey: 'dashboard' },
   { id: 'ai-studio', label: 'AI Studio', shortLabel: 'AI', icon: BrainCircuit, moduleKey: 'ai-studio' },
+  { id: 'ai-training', label: 'AI Training', shortLabel: 'AI Train', icon: Brain, moduleKey: 'ai-studio' },
   { id: 'quick-capture', label: 'Quick Capture', shortLabel: 'Capture', icon: Mic, moduleKey: 'dashboard' },
   { id: 'morning-brief', label: 'Morning Brief', shortLabel: 'Brief', icon: Clock, moduleKey: 'morning-brief' },
   { id: 'grievances', label: 'Grievances', shortLabel: 'Grievances', icon: FileText, badge: 5, moduleKey: 'grievances' },
@@ -85,7 +86,7 @@ interface SectionDef {
 }
 
 const SECTIONS: SectionDef[] = [
-  { key: 'command', label: 'COMMAND', icon: Zap, defaultOpen: true, order: 1, itemIds: ['dashboard', 'ai-studio', 'quick-capture', 'morning-brief'] },
+  { key: 'command', label: 'COMMAND', icon: Zap, defaultOpen: true, order: 1, itemIds: ['dashboard', 'ai-studio', 'ai-training', 'quick-capture', 'morning-brief'] },
   { key: 'work', label: 'MY WORK', icon: CalendarCheck, defaultOpen: true, order: 2, itemIds: ['grievances', 'appointments', 'events', 'projects', 'darshan', 'darshans'] },
   { key: 'political', label: 'POLITICAL OPS', icon: Target, defaultOpen: false, order: 3, itemIds: ['voters', 'booths', 'polls', 'legislative', 'citizen', 'promises'] },
   { key: 'intelligence', label: 'INTELLIGENCE', icon: Activity, defaultOpen: false, order: 4, itemIds: ['omniscan', 'sentiment', 'opposition', 'media', 'whatsapp-intelligence', 'voice-intelligence', 'content-factory', 'smart-visit', 'briefing'] },
