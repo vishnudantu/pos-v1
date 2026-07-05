@@ -755,6 +755,7 @@ app.use('/api/darshan_quotas',        crud('darshan_quotas',         []));
 app.use('/api/darshan_waiting_list',  crud('darshan_waiting_list',   ['pilgrim_name','status']));
 app.use('/api/darshan_requests',      crud('darshan_requests',       ['pilgrim_name','status']));
 app.use('/api/darshan',               darshanRoutes);
+app.use('/api/darshans', crud('darshans', ['temple_name','darshan_date','status','pilgrim_name','pilgrim_contact','location','group_size','notes']));
 app.use('/api/predictive_alerts',     crud('predictive_alerts',      ['alert_type','description','status']));
 app.use('/api/agent_tasks',           crud('agent_tasks',            ['agent_type','task_type','status']));
 app.use('/api/deepfake_incidents',    crud('deepfake_incidents',     ['platform','status','content_url']));
