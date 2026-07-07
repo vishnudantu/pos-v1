@@ -22,12 +22,12 @@ import {
   Landmark,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { StatCard } from '../components/primitives/StatCard'
-import { SectionCard } from '../components/primitives/SectionCard'
-import { Button } from '../components/primitives/Button'
-import { Badge } from '../components/primitives/Badge'
-import { EmptyState } from '../components/primitives/EmptyState'
-import { Loading } from '../components/primitives/Loading'
+import { StatCard } from '../primitives/StatCard'
+import { SectionCard } from '../primitives/SectionCard'
+import { Button } from '../primitives/Button'
+import { Badge } from '../primitives/Badge'
+import { EmptyState } from '../primitives/EmptyState'
+import { Loading } from '../primitives/Loading'
 import { DashboardLayout } from './DashboardLayout'
 import { api } from '../../lib/api'
 
