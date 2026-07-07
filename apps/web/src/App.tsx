@@ -1,10 +1,11 @@
-import { useState, useEffect, useMemo } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './lib/auth';
 import { LanguageProvider } from './lib/i18n';
-import Layout from './components/layout/Layout';
+import { AppShell } from './components/shell';
+import { DashboardRouter } from './components/dashboard/DashboardRouter';
+
 import Login from './pages/Login';
 import PartyManager from './pages/PartyManager';
-import Dashboard from './pages/Dashboard';
 import Grievances from './pages/Grievances';
 import Events from './pages/Events';
 import Team from './pages/Team';
@@ -56,24 +57,14 @@ import PartyIntegration from './pages/PartyIntegration';
 import DigitalTwin from './pages/DigitalTwin';
 
 function AppContent() {
-  const { user, userRole, loading, hasModule } = useAuth();
-  const [activePage, setActivePage] = useState('dashboard');
-  const isSuperAdmin = userRole?.role === 'super_admin';
-  const superAdminPages = useMemo(() => new Set(['superadmin', 'website-admin', 'party-manager']), []);
-
-  useEffect(() => {
-    if (isSuperAdmin && !superAdminPages.has(activePage)) {
-      setActivePage('superadmin');
-    }
-  }, [activePage, isSuperAdmin, superAdminPages]);
+  const { user, loading } = useAuth() as any;
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#060b18' }}>
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
-          <div className="w-10 h-10 rounded-full border-2 animate-spin mx-auto mb-4"
-            style={{ borderColor: 'rgba(0,212,170,0.2)', borderTopColor: '#00d4aa' }} />
-          <div style={{ fontSize: 13, color: '#8899bb' }}>Loading Nethra...</div>
+          <div className="w-10 h-10 rounded-full border-2 border-primary/20 border-t-primary animate-spin mx-auto mb-4" />
+          <div className="text-sm text-muted-foreground">Loading Nethra...</div>
         </div>
       </div>
     );
@@ -83,90 +74,65 @@ function AppContent() {
     return <Login />;
   }
 
-  function renderPage() {
-    // Handle tenant-manager before super_admin check
-    // Handle party-manager before super_admin check
-    if (activePage === 'party-manager') {
-      return <PartyManager />;
-    }
-
-    if (activePage === 'party-manager') {
-      return <PartyManager />;
-    }
-
-    if (isSuperAdmin) {
-      return activePage === 'website-admin' ? <WebsiteAdmin /> : <SuperAdmin onNavigate={setActivePage} />;
-    }
-    if (!hasModule(activePage)) {
-      return (
-        <div className="rounded-2xl p-6 text-center" style={{ background: 'rgba(255,85,85,0.08)', border: '1px solid rgba(255,85,85,0.2)', color: '#ff7777' }}>
-          <div style={{ fontSize: 16, fontWeight: 700 }}>Module Disabled</div>
-          <div style={{ fontSize: 12, color: '#ff9999', marginTop: 6 }}>
-            This module has been disabled by the Super Admin for your account.
-          </div>
-        </div>
-      );
-    }
-    switch (activePage) {
-      case 'dashboard': return <Dashboard onNavigate={setActivePage} />;
-      case 'quick-capture': return <QuickCapture />;
-      case 'constituency': return <Constituency />;
-      case 'grievances': return <Grievances />;
-      case 'events': return <Events />;
-      case 'team': return <Team />;
-      case 'voters': return <Voters />;
-      case 'projects': return <Projects />;
-      case 'media': return <Media />;
-      case 'communication': return <Communication />;
-      case 'finance': return <Finance />;
-      case 'analytics': return <Analytics />;
-      case 'documents': return <Documents />;
-      case 'settings': return <Settings />;
-      case 'appointments': return <Appointments />;
-      case 'polls': return <Polls />;
-      case 'booths': return <BoothManagement />;
-      case 'darshan': return <Darshan />;
-      case 'darshans': return <Darshans />;
-      case 'ai-training': return <AITraining />;
-      case 'legislative': return <Legislative />;
-      case 'citizen': return <CitizenEngagement />;
-      case 'profile': return <Profile />;
-      case 'parliamentary': return <Parliamentary />;
-      case 'briefing': return <PoliticalBriefing />;
-      case 'omniscan': return <OmniScan />;
-      case 'morning-brief': return <MorningBrief />;
-      case 'sentiment': return <SentimentDashboard />;
-      case 'opposition': return <OppositionTracker />;
-      case 'voice-intelligence': return <VoiceIntelligence />;
-      case 'website-admin': return <WebsiteAdmin />;
-      case 'promises': return <PromisesTracker />;
-      case 'content-factory': return <ContentFactory />;
-      case 'whatsapp-intelligence': return <WhatsAppIntelligence />;
-      case 'smart-visit': return <SmartVisitPlanner />;
-      case 'predictive-crisis': return <PredictiveCrisis />;
-      case 'agent-system': return <AgentSystem />;
-      case 'deepfake-shield': return <DeepfakeShield />;
-      case 'coalition-forecast': return <CoalitionForecast />;
-      case 'crisis-war-room': return <CrisisWarRoom />;
-      case 'relationship-graph': return <RelationshipGraph />;
-      case 'economic-intelligence': return <EconomicIntelligence />;
-      case 'citizen-services': return <CitizenServices />;
-      case 'election-command': return <ElectionCommandCenter />;
-      case 'finance-compliance': return <FinancialCompliance />;
-      case 'party-integration': return <PartyIntegration />;
-      case 'digital-twin': return <DigitalTwin />;
-      case 'superadmin': return <SuperAdmin onNavigate={setActivePage} />;
-      case 'ai-studio': return <AIStudio />;
-      case 'party-manager': return <PartyManager />;
-      case 'staff-management': return <StaffManagement />;
-      default: return <Dashboard onNavigate={setActivePage} />;
-    }
-  }
-
   return (
-    <Layout activePage={activePage} onNavigate={setActivePage}>
-      {renderPage()}
-    </Layout>
+    <Routes>
+      <Route element={<AppShell />}>
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/dashboard" element={<DashboardRouter />} />
+        <Route path="/morning-brief" element={<MorningBrief />} />
+        <Route path="/ai-studio" element={<AIStudio />} />
+        <Route path="/media" element={<Media />} />
+        <Route path="/omniscan" element={<OmniScan />} />
+        <Route path="/sentiment" element={<SentimentDashboard />} />
+        <Route path="/narrative" element={<SentimentDashboard />} />
+        <Route path="/grievances" element={<Grievances />} />
+        <Route path="/events" element={<Events />} />
+        <Route path="/appointments" element={<Appointments />} />
+        <Route path="/voters" element={<Voters />} />
+        <Route path="/booths" element={<BoothManagement />} />
+        <Route path="/darshan" element={<Darshan />} />
+        <Route path="/darshans" element={<Darshans />} />
+        <Route path="/team" element={<Team />} />
+        <Route path="/projects" element={<Projects />} />
+        <Route path="/finance" element={<Finance />} />
+        <Route path="/analytics" element={<Analytics />} />
+        <Route path="/communication" element={<Communication />} />
+        <Route path="/documents" element={<Documents />} />
+        <Route path="/constituency" element={<Constituency />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="/polls" element={<Polls />} />
+        <Route path="/ai-training" element={<AITraining />} />
+        <Route path="/legislative" element={<Legislative />} />
+        <Route path="/citizen" element={<CitizenEngagement />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/parliamentary" element={<Parliamentary />} />
+        <Route path="/briefing" element={<PoliticalBriefing />} />
+        <Route path="/opposition" element={<OppositionTracker />} />
+        <Route path="/voice-intelligence" element={<VoiceIntelligence />} />
+        <Route path="/quick-capture" element={<QuickCapture />} />
+        <Route path="/promises" element={<PromisesTracker />} />
+        <Route path="/content-factory" element={<ContentFactory />} />
+        <Route path="/whatsapp-intelligence" element={<WhatsAppIntelligence />} />
+        <Route path="/smart-visit" element={<SmartVisitPlanner />} />
+        <Route path="/predictive-crisis" element={<PredictiveCrisis />} />
+        <Route path="/agent-system" element={<AgentSystem />} />
+        <Route path="/deepfake-shield" element={<DeepfakeShield />} />
+        <Route path="/coalition-forecast" element={<CoalitionForecast />} />
+        <Route path="/crisis-war-room" element={<CrisisWarRoom />} />
+        <Route path="/relationship-graph" element={<RelationshipGraph />} />
+        <Route path="/economic-intelligence" element={<EconomicIntelligence />} />
+        <Route path="/citizen-services" element={<CitizenServices />} />
+        <Route path="/election-command" element={<ElectionCommandCenter />} />
+        <Route path="/finance-compliance" element={<FinancialCompliance />} />
+        <Route path="/party-integration" element={<PartyIntegration />} />
+        <Route path="/digital-twin" element={<DigitalTwin />} />
+        <Route path="/superadmin" element={<SuperAdmin onNavigate={() => {}} />} />
+        <Route path="/website-admin" element={<WebsiteAdmin />} />
+        <Route path="/party-manager" element={<PartyManager />} />
+        <Route path="/staff-management" element={<StaffManagement />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Route>
+    </Routes>
   );
 }
 
