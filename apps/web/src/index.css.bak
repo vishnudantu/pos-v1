@@ -1,0 +1,100 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Obsidian foundation */
+    --background: 222 47% 6%;
+    --foreground: 210 40% 96%;
+
+    /* Surface layers — flat, no blur */
+    --surface-base: 222 47% 8%;
+    --surface-elevated: 222 45% 10%;
+    --surface-raised: 222 42% 13%;
+    --surface-floating: 222 40% 16%;
+
+    /* Borders — 1px subtle */
+    --border-subtle: 220 20% 18%;
+    --border-default: 220 20% 22%;
+    --border-strong: 220 20% 28%;
+
+    /* Professional blue accent */
+    --accent: 217 91% 60%;
+    --accent-muted: 217 60% 45%;
+    --accent-foreground: 0 0% 100%;
+
+    /* Semantic colors */
+    --success: 142 76% 45%;
+    --warning: 38 92% 50%;
+    --danger: 0 84% 60%;
+    --info: 199 89% 48%;
+
+    /* Text */
+    --text-primary: 210 40% 98%;
+    --text-secondary: 215 20% 65%;
+    --text-tertiary: 215 16% 47%;
+    --text-muted: 215 14% 34%;
+
+    /* Radius */
+    --radius: 0.5rem;
+    --radius-sm: 0.375rem;
+    --radius-lg: 0.75rem;
+    --radius-xl: 1rem;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5);
+  }
+
+  .light {
+    --background: 0 0% 98%;
+    --foreground: 222 47% 11%;
+
+    --surface-base: 0 0% 100%;
+    --surface-elevated: 0 0% 97%;
+    --surface-raised: 0 0% 94%;
+    --surface-floating: 0 0% 90%;
+
+    --border-subtle: 220 13% 88%;
+    --border-default: 220 13% 82%;
+    --border-strong: 220 13% 72%;
+
+    --accent: 217 91% 55%;
+    --accent-muted: 217 70% 45%;
+    --accent-foreground: 0 0% 100%;
+
+    --text-primary: 222 47% 11%;
+    --text-secondary: 215 16% 47%;
+    --text-tertiary: 215 14% 40%;
+    --text-muted: 215 14% 60%;
+  }
+
+  * {
+    @apply border-border-subtle;
+  }
+
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .surface-flat {
+    @apply bg-surface-elevated border border-border-subtle;
+  }
+
+  .focus-ring {
+    @apply outline-none ring-2 ring-accent ring-offset-2 ring-offset-background;
+  }
+}

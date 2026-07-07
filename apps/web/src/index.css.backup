@@ -9,8 +9,6 @@
   --nethra-blue: #1e88e5;
   --nethra-amber: #ff9800;
   --nethra-red: #ff5555;
-  --nethra-green: #00c864;
-
   --nethra-bg: #0b1221;
   --nethra-bg-elevated: #0d1628;
   --nethra-card: rgba(255, 255, 255, 0.04);
@@ -20,19 +18,10 @@
   --nethra-text: #f0f4ff;
   --nethra-text-secondary: #8899bb;
   --nethra-text-tertiary: rgba(136, 153, 187, 0.6);
-
   --nethra-radius: 16px;
   --nethra-radius-sm: 10px;
-  --nethra-radius-xs: 8px;
-
   --nethra-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-  --nethra-shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.25);
   --nethra-glow-teal: 0 0 30px rgba(0, 212, 170, 0.25);
-  --nethra-glow-blue: 0 0 30px rgba(30, 136, 229, 0.25);
-
-  --sidebar-width: 260px;
-  --sidebar-rail-width: 72px;
-  --header-height: 64px;
 }
 
 * { box-sizing: border-box; }
@@ -47,12 +36,10 @@ body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
-  min-height: 100dvh;
   background: var(--nethra-bg);
   background-image:
     radial-gradient(circle at 15% 0%, rgba(0, 212, 170, 0.08) 0%, transparent 35%),
     radial-gradient(circle at 85% 100%, rgba(30, 136, 229, 0.08) 0%, transparent 35%);
-  background-attachment: fixed;
   color: var(--nethra-text);
   overflow-x: hidden;
 }
@@ -70,8 +57,6 @@ h1, h2, h3, h4, h5, h6 {
 select, input, textarea { color-scheme: dark; }
 select option { background-color: #151b2e; color: #e2e8f0; }
 
-button { font-family: inherit; }
-
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes shimmer {
   0% { background-position: -200% 0; }
@@ -81,10 +66,6 @@ button { font-family: inherit; }
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-8px); }
 }
-@keyframes pageIn {
-  from { opacity: 0; transform: translateY(12px); filter: blur(4px); }
-  to { opacity: 1; transform: translateY(0); filter: blur(0); }
-}
 
 .animate-spin { animation: spin 1s linear infinite; }
 .animate-shimmer {
@@ -93,7 +74,6 @@ button { font-family: inherit; }
   animation: shimmer 2s infinite;
 }
 .animate-float { animation: float 6s ease-in-out infinite; }
-.animate-page-in { animation: pageIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
 @layer components {
   .nethra-glass {
@@ -119,8 +99,6 @@ button { font-family: inherit; }
     box-shadow: 0 0 0 2px rgba(0, 212, 170, 0.35);
   }
   .touch-min { min-height: 48px; min-width: 48px; }
-  .safe-pb { padding-bottom: env(safe-area-inset-bottom, 0px); }
-  .safe-px { padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
 }
 
 .floating-orb {

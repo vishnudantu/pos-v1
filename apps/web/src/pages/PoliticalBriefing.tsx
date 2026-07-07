@@ -2,6 +2,10 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Plus, X, CheckCircle, AlertTriangle, TrendingUp, FileText, Mic, Target, Eye, Bell, Zap, ChevronDown, ChevronUp, Star, MessageSquare, BarChart3, Lightbulb, Shield, Users, CreditCard as Edit2, Trash2, BookOpen, Radio, Flame } from 'lucide-react';
 import { api } from '../lib/api';
+import Input from '../components/ui/Input';
+import Select from '../components/ui/Select';
+import Textarea from '../components/ui/Textarea';
+import Button from '../components/ui/Button';
 
 type BriefingType = 'Daily Digest' | 'Speech Draft' | 'Talking Points' | 'Risk Alert' | 'Opportunity Alert' | 'Opposition Tracker' | 'Constituency Pulse';
 type Priority = 'Low' | 'Medium' | 'High' | 'Critical';
@@ -110,6 +114,16 @@ const DIFFERENTIATORS = [
   },
 ];
 
+import Input from '../components/ui/Input';
+import Select from '../components/ui/Select';
+import Textarea from '../components/ui/Textarea';
+import Button from '../components/ui/Button';
+
+import Input from '../components/ui/Input';
+import Select from '../components/ui/Select';
+import Textarea from '../components/ui/Textarea';
+import Button from '../components/ui/Button';
+
 function BriefingModal({ b, onClose, onSave }: { b: Partial<Briefing> | null; onClose: () => void; onSave: () => void }) {
   const isEdit = !!b?.id;
   const [form, setForm] = useState({
@@ -121,7 +135,7 @@ function BriefingModal({ b, onClose, onSave }: { b: Partial<Briefing> | null; on
     priority: (b?.priority || 'Medium') as Priority,
     is_read: b?.is_read || false,
     tags: (b?.tags || []).join(', '),
-    source_refs: (b?.source_refs || []).join('\n'),
+    source_refs: (b?.source_refs || []).join('\\n'),
   });
   const [saving, setSaving] = useState(false);
 
@@ -131,7 +145,7 @@ function BriefingModal({ b, onClose, onSave }: { b: Partial<Briefing> | null; on
     const payload = {
       ...form,
       tags: form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
-      source_refs: form.source_refs ? form.source_refs.split('\n').map(r => r.trim()).filter(Boolean) : [],
+      source_refs: form.source_refs ? form.source_refs.split('\\n').map(r => r.trim()).filter(Boolean) : [],
     };
     if (isEdit && b?.id) {
       await api.update('ai_briefings', b.id, payload);
@@ -143,72 +157,95 @@ function BriefingModal({ b, onClose, onSave }: { b: Partial<Briefing> | null; on
     onClose();
   }
 
-  const meta = TYPE_META[form.briefing_type];
+  const meta = TYPE_META[form.briefing_type] || { icon: FileText, color: '#8899bb', bg: 'rgba(136,153,187,0.1)', desc: 'Briefing' };
+
+  const typeOptions = Object.keys(TYPE_META).map(t => ({ value: t, label: t }));
+  const priorityOptions = ['Low', 'Medium', 'High', 'Critical'].map(p => ({ value: p, label: p }));
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
-        className="glass-card rounded-2xl w-full max-w-2xl overflow-y-auto max-h-[90vh]"
-        style={{ border: '1px solid rgba(255,255,255,0.12)' }} onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between p-6 border-b border-white/10">
-          <h2 className="font-bold text-xl" style={{ fontFamily: 'Space Grotesk', color: '#f0f4ff' }}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-surface-DEFAULT/80 backdrop-blur-sm" onClick={onClose}>
+      <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }}
+        className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-nethra bg-surface-elevated border border-border-strong shadow-nethra"
+        onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-5 md:p-6 border-b border-border-DEFAULT">
+          <h2 className="text-lg md:text-xl font-bold text-content-DEFAULT font-display">
             {isEdit ? 'Edit Briefing' : 'Add Briefing / Note'}
           </h2>
-          <button onClick={onClose} className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.08)' }}>
-            <X size={16} style={{ color: '#8899bb' }} />
+          <button onClick={onClose} className="w-9 h-9 rounded-nethra-sm flex items-center justify-center bg-surface-card hover:bg-surface-card-hover border border-border-DEFAULT text-content-secondary transition-colors">
+            <X size={18} />
           </button>
         </div>
-        <div className="p-6 space-y-4">
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label style={{ fontSize: 12, color: '#8899bb', display: 'block', marginBottom: 6, fontWeight: 500 }}>Type</label>
-              <select className="input-field" value={form.briefing_type} onChange={e => setForm({ ...form, briefing_type: e.target.value as BriefingType })}>
-                {Object.keys(TYPE_META).map(t => <option key={t}>{t}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={{ fontSize: 12, color: '#8899bb', display: 'block', marginBottom: 6, fontWeight: 500 }}>Priority</label>
-              <select className="input-field" value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value as Priority })}>
-                {['Low', 'Medium', 'High', 'Critical'].map(p => <option key={p}>{p}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={{ fontSize: 12, color: '#8899bb', display: 'block', marginBottom: 6, fontWeight: 500 }}>Date</label>
-              <input type="date" className="input-field" value={form.briefing_date} onChange={e => setForm({ ...form, briefing_date: e.target.value })} />
-            </div>
+
+        <div className="p-5 md:p-6 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Select
+              label="Type"
+              options={typeOptions}
+              value={form.briefing_type}
+              onChange={e => setForm({ ...form, briefing_type: e.target.value as BriefingType })}
+            />
+            <Select
+              label="Priority"
+              options={priorityOptions}
+              value={form.priority}
+              onChange={e => setForm({ ...form, priority: e.target.value as Priority })}
+            />
+            <Input
+              label="Date"
+              type="date"
+              value={form.briefing_date}
+              onChange={e => setForm({ ...form, briefing_date: e.target.value })}
+            />
           </div>
 
-          <div className="p-3 rounded-xl flex items-center gap-3" style={{ background: meta.bg, border: `1px solid ${meta.color}25` }}>
-            <meta.icon size={15} style={{ color: meta.color, flexShrink: 0 }} />
-            <span style={{ fontSize: 12, color: meta.color }}>{meta.desc}</span>
+          <div className="p-3 rounded-nethra-sm flex items-center gap-3" style={{ background: meta.bg, border: `1px solid ${meta.color}25` }}>
+            <meta.icon size={16} style={{ color: meta.color, flexShrink: 0 }} />
+            <span className="text-xs" style={{ color: meta.color }}>{meta.desc}</span>
           </div>
 
-          <div>
-            <label style={{ fontSize: 12, color: '#8899bb', display: 'block', marginBottom: 6, fontWeight: 500 }}>Title *</label>
-            <input className="input-field" placeholder="Brief descriptive title" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
-          </div>
-          <div>
-            <label style={{ fontSize: 12, color: '#8899bb', display: 'block', marginBottom: 6, fontWeight: 500 }}>Summary (1-2 lines)</label>
-            <input className="input-field" placeholder="TL;DR of this briefing" value={form.summary} onChange={e => setForm({ ...form, summary: e.target.value })} />
-          </div>
-          <div>
-            <label style={{ fontSize: 12, color: '#8899bb', display: 'block', marginBottom: 6, fontWeight: 500 }}>Full Content</label>
-            <textarea className="input-field" rows={6} placeholder="Full briefing content, speech draft, talking points list..." value={form.content} onChange={e => setForm({ ...form, content: e.target.value })} style={{ resize: 'vertical' }} />
-          </div>
-          <div>
-            <label style={{ fontSize: 12, color: '#8899bb', display: 'block', marginBottom: 6, fontWeight: 500 }}>Tags (comma separated)</label>
-            <input className="input-field" placeholder="e.g. MSME, Guntur, irrigation, budget" value={form.tags} onChange={e => setForm({ ...form, tags: e.target.value })} />
-          </div>
-          <div>
-            <label style={{ fontSize: 12, color: '#8899bb', display: 'block', marginBottom: 6, fontWeight: 500 }}>Source References (one per line)</label>
-            <textarea className="input-field" rows={2} placeholder="URLs, newspaper articles, data sources used" value={form.source_refs} onChange={e => setForm({ ...form, source_refs: e.target.value })} style={{ resize: 'none' }} />
-          </div>
+          <Input
+            label="Title *"
+            placeholder="Brief descriptive title"
+            value={form.title}
+            onChange={e => setForm({ ...form, title: e.target.value })}
+          />
+
+          <Input
+            label="Summary (1-2 lines)"
+            placeholder="TL;DR of this briefing"
+            value={form.summary}
+            onChange={e => setForm({ ...form, summary: e.target.value })}
+          />
+
+          <Textarea
+            label="Full Content"
+            placeholder="Full briefing content, speech draft, talking points list..."
+            rows={6}
+            value={form.content}
+            onChange={e => setForm({ ...form, content: e.target.value })}
+          />
+
+          <Input
+            label="Tags (comma separated)"
+            placeholder="e.g. MSME, Guntur, irrigation, budget"
+            value={form.tags}
+            onChange={e => setForm({ ...form, tags: e.target.value })}
+          />
+
+          <Textarea
+            label="Source References (one per line)"
+            placeholder="URLs, newspaper articles, data sources used"
+            rows={3}
+            value={form.source_refs}
+            onChange={e => setForm({ ...form, source_refs: e.target.value })}
+          />
         </div>
-        <div className="flex gap-3 p-6 border-t border-white/10">
-          <button onClick={onClose} className="btn-secondary flex-1">Cancel</button>
-          <button onClick={handleSave} className="btn-primary flex-1" disabled={saving || !form.title}>
-            {saving ? 'Saving...' : isEdit ? 'Update Briefing' : 'Save Briefing'}
-          </button>
+
+        <div className="flex gap-3 p-5 md:p-6 border-t border-border-DEFAULT">
+          <Button variant="ghost" size="md" className="flex-1" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" size="md" className="flex-1" loading={saving} disabled={!form.title} onClick={handleSave}>
+            {isEdit ? 'Update Briefing' : 'Save Briefing'}
+          </Button>
         </div>
       </motion.div>
     </div>
@@ -316,7 +353,7 @@ export default function PoliticalBriefing() {
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div className="flex gap-2 flex-wrap">
                 {typeButtons.map(t => {
-                  const meta = t !== 'All' ? TYPE_META[t] : null;
+                  const meta = t !== 'All' ? (TYPE_META[t as BriefingType] || { icon: FileText, color: '#8899bb', bg: 'rgba(136,153,187,0.1)', desc: 'Briefing' }) : null;
                   const isActive = filter === t;
                   return (
                     <button key={t} onClick={() => setFilter(t)}
@@ -343,8 +380,16 @@ export default function PoliticalBriefing() {
                 <p style={{ color: '#8899bb', fontSize: 13 }}>Add daily digests, speech drafts, risk alerts, or opportunity notes for your political team.</p>
               </div>
             ) : filtered.map((b, i) => {
-              const meta = TYPE_META[b.briefing_type];
-              const priorityMeta = PRIORITY_META[b.priority];
+              const meta = TYPE_META[b.briefing_type] || {
+                icon: FileText,
+                color: '#8899bb',
+                bg: 'rgba(136,153,187,0.1)',
+                desc: 'Briefing',
+              };
+              const priorityMeta = PRIORITY_META[b.priority] || {
+                color: '#8899bb',
+                bg: 'rgba(136,153,187,0.1)',
+              };
               return (
                 <motion.div key={b.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
                   className="glass-card rounded-2xl overflow-hidden"

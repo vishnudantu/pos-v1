@@ -1,262 +1,115 @@
-import { motion } from 'framer-motion';
-import { useEffect, useRef, useState } from 'react';
-import { Bell, Search, Menu, X, LogOut, User, Settings } from 'lucide-react';
+import { Menu, Bell, Search } from 'lucide-react';
 import { useAuth } from '../../lib/auth';
-import { api } from '../../lib/api';
-import { useI18n } from '../../lib/i18n';
 
 interface HeaderProps {
-  title: string;
-  sidebarCollapsed: boolean;
-  onToggleSidebar: () => void;
-  isMobile?: boolean;
-  mobileMenuOpen?: boolean;
-  onNavigate: (page: string) => void;
+  activePage: string;
+  onMenuToggle: () => void;
 }
 
-const pageInfo: Record<string, { title: string; subtitle: string }> = {
-  dashboard: { title: 'Dashboard', subtitle: 'Welcome back, overview of your constituency' },
-  'quick-capture': { title: 'Quick Capture', subtitle: 'Voice-first capture for field workers' },
-  profile: { title: 'Politician Profile', subtitle: 'Manage your public profile and bio' },
-  constituency: { title: 'Constituency', subtitle: 'Constituency details and demographics' },
-  grievances: { title: 'Grievances', subtitle: 'Citizen petitions and complaint management' },
-  appointments: { title: 'Appointments', subtitle: 'Schedule and appointment management' },
-  events: { title: 'Events & Schedule', subtitle: 'Calendar and event management' },
-  team: { title: 'Team Management', subtitle: 'Staff and team member directory' },
-  voters: { title: 'Voter Database', subtitle: 'Constituent records and voter data' },
-  polls: { title: 'Polls & Surveys', subtitle: 'Opinion polls and constituency surveys' },
-  booths: { title: 'Booth Management', subtitle: 'Booth-level data and election agents' },
-  legislative: { title: 'Legislative', subtitle: 'Bills, acts and legislative activities' },
-  citizen: { title: 'Citizen Engagement', subtitle: 'Community outreach and engagement' },
-  darshan: { title: 'Tirupati Darshan', subtitle: 'Darshan booking and management' },
-  darshans: { title: 'Darshans', subtitle: 'Multi-temple darshan requests' },
-  parliamentary: { title: 'Parliamentary', subtitle: 'Parliamentary activities and questions' },
-  omniscan: { title: 'OmniScan', subtitle: '24/7 media and social intelligence pipeline' },
-  'morning-brief': { title: 'Morning Brief', subtitle: 'Daily intelligence summary and priorities' },
-  briefing: { title: 'Political Briefings', subtitle: 'AI-powered political intelligence' },
-  projects: { title: 'Development Projects', subtitle: 'Infrastructure and development tracking' },
-  media: { title: 'Media Monitor', subtitle: 'Press coverage and sentiment analysis' },
-  communication: { title: 'Communication Hub', subtitle: 'Mass outreach and messaging' },
-  finance: { title: 'Finance & Budget', subtitle: 'Fund allocation and expenditure tracking' },
-  analytics: { title: 'Analytics', subtitle: 'Insights and performance metrics' },
-  documents: { title: 'Documents', subtitle: 'Official documents and files' },
-  settings: { title: 'Settings', subtitle: 'Application preferences' },
-  superadmin: { title: 'Platform Administration', subtitle: 'Deploy and manage politician accounts' },
-  'ai-studio': { title: 'AI Studio', subtitle: 'Generate speeches, briefings and political content with AI' },
-  sentiment: { title: 'Sentiment Dashboard', subtitle: 'Real-time constituency mood and trends' },
-  opposition: { title: 'Opposition Tracker', subtitle: 'Monitor opposition activity and threats' },
-  'voice-intelligence': { title: 'Voice Intelligence', subtitle: 'Field voice reports and transcription' },
-  promises: { title: 'Promises Tracker', subtitle: 'Track public commitments and fulfillment' },
-  'content-factory': { title: 'Content Factory', subtitle: 'Automated political content generation' },
-  'whatsapp-intelligence': { title: 'WhatsApp Intelligence', subtitle: 'WhatsApp signals, alerts, and routing' },
-  'smart-visit': { title: 'Smart Visit Planner', subtitle: 'AI-recommended constituency visits' },
-  'predictive-crisis': { title: 'Predictive Crisis Intelligence', subtitle: 'Early warning risk signals' },
-  'agent-system': { title: 'Autonomous Agent System', subtitle: 'AI agent task orchestration' },
-  'deepfake-shield': { title: 'Deepfake Shield', subtitle: 'Disinformation and deepfake defense' },
-  'coalition-forecast': { title: 'Coalition Forecasting', subtitle: 'Alliance modeling and coalition viability' },
-  'crisis-war-room': { title: 'Crisis War Room', subtitle: 'Incident response and war room playbooks' },
-  'relationship-graph': { title: 'Relationship Graph', subtitle: 'Political relationship intelligence' },
-  'economic-intelligence': { title: 'Economic Intelligence', subtitle: 'Local economic signals and stress' },
-  'citizen-services': { title: 'Citizen Services', subtitle: 'Constituent service request hub' },
-  'election-command': { title: 'Election Command Center', subtitle: 'Election day operations and updates' },
-  'finance-compliance': { title: 'Financial Compliance', subtitle: 'Expense compliance and audit readiness' },
-  'party-integration': { title: 'Party Integration', subtitle: 'Party-level coordination and sync' },
-  'digital-twin': { title: 'Digital Twin', subtitle: 'Scenario simulation and persona outputs' },
-  'staff-management': { title: 'Staff Management', subtitle: 'Create and manage login accounts for your team' },
-  'website-admin': { title: 'Website CMS', subtitle: 'Manage website content blocks' },
+const pageTitles: Record<string, string> = {
+  dashboard: 'Dashboard',
+  'quick-capture': 'Quick Capture',
+  constituency: 'Constituency',
+  grievances: 'Grievances',
+  events: 'Events',
+  team: 'Team',
+  voters: 'Voters',
+  projects: 'Projects',
+  media: 'Media Monitor',
+  communication: 'Communication',
+  finance: 'Finance',
+  analytics: 'Analytics',
+  documents: 'Documents',
+  settings: 'Settings',
+  appointments: 'Appointments',
+  polls: 'Polls',
+  booths: 'Booth Management',
+  darshan: 'Darshan',
+  darshans: 'Multi-Temple Darshan',
+  'ai-training': 'AI Training',
+  legislative: 'Legislative Tracker',
+  citizen: 'Citizen Engagement',
+  profile: 'Profile',
+  parliamentary: 'Parliamentary Tracker',
+  briefing: 'Political Briefing',
+  omniscan: 'OmniScan',
+  'morning-brief': 'Morning Brief',
+  sentiment: 'Sentiment Dashboard',
+  opposition: 'Opposition Tracker',
+  'voice-intelligence': 'Voice Intelligence',
+  'website-admin': 'Website Admin',
+  superadmin: 'Super Admin',
+  promises: 'Promise Tracker',
+  'content-factory': 'Content Factory',
+  'whatsapp-intelligence': 'WhatsApp Intelligence',
+  'smart-visit': 'Smart Visit Planner',
+  'predictive-crisis': 'Predictive Crisis Center',
+  'agent-system': 'Agent System',
+  'deepfake-shield': 'Deepfake Shield',
+  'coalition-forecast': 'Coalition Forecast',
+  'crisis-war-room': 'Crisis War Room',
+  'relationship-graph': 'Relationship Graph',
+  'economic-intelligence': 'Economic Intelligence',
+  'citizen-services': 'Citizen Services',
+  'election-command': 'Election Command',
+  'finance-compliance': 'Financial Compliance',
+  'party-integration': 'Party Integrations',
+  'digital-twin': 'Digital Twin',
+  'party-manager': 'Party Manager',
+  'staff-management': 'Staff Management',
+  'ai-studio': 'AI Studio',
 };
 
-interface SearchResult { id: string; type: string; title: string; subtitle: string; page: string; }
-interface NotificationItem { id: string; title: string; message: string; link: string; is_read: number; created_at: string; }
+export default function Header({ activePage, onMenuToggle }: HeaderProps) {
+  const { user } = useAuth();
+  const title = pageTitles[activePage] || activePage
+    .replace(/-/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase());
 
-export default function Header({ title, sidebarCollapsed, onToggleSidebar, isMobile, mobileMenuOpen, onNavigate }: HeaderProps) {
-  const { activePolitician, signOut, user } = useAuth();
-  const { t, languages, language, setLanguage } = useI18n();
-  const info = pageInfo[title] || { title, subtitle: '' };
-  const translatedTitle = (() => { const label = t(`nav.${title}`); return label.startsWith('nav.') ? info.title : label; })();
-  const now = new Date();
-  const dateStr = now.toLocaleDateString('en-IN', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
-
-  const isSuperAdmin = user?.role === 'super_admin';
-  const primaryColor = activePolitician?.color_primary || '#00d4aa';
-  const secondaryColor = activePolitician?.color_secondary || '#1e88e5';
-  const displayName = (() => {
-    if (!isSuperAdmin) return activePolitician?.full_name || 'NA';
-    if (user?.display_name) return user.display_name;
-    if (user?.email) return user.email.split('@')[0];
-    return 'Super Admin';
-  })();
-  const initials = displayName.split(' ').map(n => n[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
-
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
-  const [loadingSearch, setLoadingSearch] = useState(false);
-  const searchRef = useRef<HTMLDivElement>(null);
-  const notifRef = useRef<HTMLDivElement>(null);
-  const profileRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClick = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (searchRef.current && !searchRef.current.contains(target)) setSearchOpen(false);
-      if (notifRef.current && !notifRef.current.contains(target)) setNotificationsOpen(false);
-      if (profileRef.current && !profileRef.current.contains(target)) setProfileOpen(false);
-    };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, []);
-
-  useEffect(() => {
-    let timer: number | undefined;
-    if (searchQuery.trim()) {
-      setLoadingSearch(true);
-      timer = window.setTimeout(async () => {
-        try {
-          const data = await api.get(`/api/search?q=${encodeURIComponent(searchQuery.trim())}`) as SearchResult[];
-          setSearchResults(data || []);
-        } catch { setSearchResults([]); }
-        setLoadingSearch(false);
-      }, 300);
-    } else {
-      setSearchResults([]);
-      setLoadingSearch(false);
-    }
-    return () => { if (timer) window.clearTimeout(timer); };
-  }, [searchQuery]);
-
-  useEffect(() => {
-    async function fetchNotifications() {
-      try {
-        const data = await api.get('/api/notifications?limit=10') as NotificationItem[];
-        setNotifications(data || []);
-      } catch { setNotifications([]); }
-    }
-    fetchNotifications();
-  }, []);
-
-  const unreadCount = notifications.filter(n => !n.is_read).length;
-
-  async function markNotificationRead(id: string) {
-    try {
-      await api.put(`/api/notifications/${id}/read`, {});
-      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: 1 } : n));
-    } catch { /* ignore */ }
-  }
-
-  function handleSignOut() {
-    signOut();
-    window.location.href = '/';
-  }
+  const name = (user as any)?.politician?.full_name || (user as any)?.email || 'User';
+  const initials = name.slice(0, 1).toUpperCase();
 
   return (
-    <motion.header
-      initial={{ y: -20, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.4 }}
-      className="sticky top-0 z-30 flex items-center justify-between px-3 sm:px-4 md:px-6 py-3 md:py-4"
-      style={{ background: 'linear-gradient(180deg, rgba(6, 11, 24, 0.96), rgba(6, 11, 24, 0.82))', backdropFilter: 'blur(24px)', borderBottom: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 10px 30px rgba(0,0,0,0.35)', minHeight: 64 }}
-    >
-      <div className="flex items-center gap-2 sm:gap-3 md:gap-4 min-w-0">
-        <button onClick={onToggleSidebar} className="w-9 h-9 flex-shrink-0 rounded-xl flex items-center justify-center transition-all" style={{ background: 'rgba(255,255,255,0.06)', color: '#8899bb' }}>
-          {(isMobile ? mobileMenuOpen : !sidebarCollapsed) ? <X size={18} /> : <Menu size={18} />}
+    <header className="sticky top-0 z-30 h-16 flex items-center justify-between px-3 md:px-5 border-b border-border-DEFAULT bg-surface-DEFAULT/80 backdrop-blur-md">
+      <div className="flex items-center gap-3 min-w-0">
+        <button
+          onClick={onMenuToggle}
+          className="xl:hidden touch-min w-9 h-9 rounded-nethra-sm flex items-center justify-center bg-surface-elevated border border-border-DEFAULT text-content-DEFAULT hover:border-border-strong transition-colors"
+          aria-label="Toggle menu"
+        >
+          <Menu size={20} />
         </button>
-        <div className="min-w-0">
-          <h1 className="font-bold text-base sm:text-lg truncate font-display text-content">{translatedTitle}</h1>
-          <p className="hidden sm:block truncate text-xs text-content-secondary">{info.subtitle}</p>
-        </div>
+        <h1 className="text-base md:text-lg font-semibold text-content-DEFAULT capitalize truncate font-display">
+          {title}
+        </h1>
       </div>
 
-      <div className="flex items-center gap-2 sm:gap-3">
-        <div ref={searchRef} className="relative">
-          <div className="hidden lg:flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', minWidth: 220 }}>
-            <Search size={15} style={{ color: '#8899bb' }} />
-            <input type="text" placeholder={t('header.search')} value={searchQuery} onFocus={() => setSearchOpen(true)} onChange={e => { setSearchQuery(e.target.value); setSearchOpen(true); }}
-              className="bg-transparent border-none outline-none text-content text-sm w-full" />
+      <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
+        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-nethra-sm bg-surface-elevated border border-border-DEFAULT text-content-secondary text-sm">
+          <Search size={16} />
+          <span className="hidden md:inline text-xs">Search ⌘K</span>
+          <span className="md:hidden text-xs">Search</span>
+        </div>
+
+        <button className="touch-min relative w-9 h-9 rounded-nethra-sm flex items-center justify-center bg-surface-elevated border border-border-DEFAULT text-content-DEFAULT hover:border-border-strong transition-colors">
+          <Bell size={18} />
+          <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-nethra-red" />
+        </button>
+
+        <div className="flex items-center gap-2 pl-1 md:pl-2">
+          <div className="w-8 h-8 md:w-9 md:h-9 rounded-nethra-sm bg-gradient-to-br from-nethra-teal to-nethra-blue flex items-center justify-center text-surface-DEFAULT font-bold text-sm">
+            {initials}
           </div>
-
-          <button className="flex lg:hidden w-9 h-9 rounded-xl items-center justify-center" onClick={() => setSearchOpen(o => !o)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#8899bb' }}>
-            <Search size={16} />
-          </button>
-
-          {searchOpen && (
-            <div className="absolute right-0 top-12 w-[85vw] sm:w-80 rounded-xl overflow-hidden z-40 bg-surface-elevated border border-border shadow-nethra">
-              <div className="p-3 border-b border-white/10 lg:hidden">
-                <input type="text" placeholder={t('header.search')} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm bg-white/[0.06] border border-white/10 text-content" />
-              </div>
-              {loadingSearch ? (
-                <div className="p-4 text-sm text-content-secondary">Searching...</div>
-              ) : searchResults.length === 0 ? (
-                <div className="p-4 text-sm text-content-secondary">{searchQuery.trim() ? 'No results.' : 'Start typing to search...'}</div>
-              ) : (
-                searchResults.map(result => (
-                  <button key={`${result.type}-${result.id}`} onClick={() => { onNavigate(result.page); setSearchOpen(false); }} className="w-full text-left px-4 py-3 hover:bg-white/5 transition-colors">
-                    <div className="text-xs sm:text-sm text-content font-semibold">{result.title}</div>
-                    <div className="text-[10px] sm:text-xs text-content-secondary">{result.subtitle}</div>
-                  </button>
-                ))
-              )}
+          <div className="hidden lg:block text-left">
+            <div className="text-sm font-medium text-content-DEFAULT truncate max-w-[140px]">
+              {name}
             </div>
-          )}
-        </div>
-
-        <div className="hidden xl:block text-right">
-          <div className="text-[11px] text-content-secondary">{dateStr}</div>
-          <div className="text-[11px] font-semibold" style={{ color: primaryColor }}>{now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</div>
-        </div>
-
-        <div ref={notifRef} className="relative">
-          <button className="w-9 h-9 rounded-xl flex items-center justify-center transition-all" onClick={() => setNotificationsOpen(o => !o)} style={{ background: 'rgba(255,255,255,0.06)', color: '#8899bb' }}>
-            <Bell size={17} />
-          </button>
-          {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: '#ff5555', color: '#fff', fontSize: 9 }}>{unreadCount}</span>
-          )}
-          {notificationsOpen && (
-            <div className="absolute right-0 top-12 w-[85vw] sm:w-80 rounded-xl overflow-hidden z-40 bg-surface-elevated border border-border shadow-nethra">
-              <div className="px-4 py-3 text-xs font-semibold text-content-secondary">{t('header.notifications')}</div>
-              {notifications.length === 0 ? (
-                <div className="px-4 pb-4 text-sm text-content-secondary">No notifications yet.</div>
-              ) : notifications.map(note => (
-                <button key={note.id} onClick={() => { if (note.link) onNavigate(note.link); markNotificationRead(note.id); setNotificationsOpen(false); }} className="w-full text-left px-4 py-3 hover:bg-white/5 transition-colors">
-                  <div className="text-xs sm:text-sm text-content font-semibold">{note.title}</div>
-                  <div className="text-[10px] sm:text-xs text-content-secondary">{note.message}</div>
-                </button>
-              ))}
+            <div className="text-xs text-content-secondary capitalize">
+              {(user as any)?.role || 'User'}
             </div>
-          )}
-        </div>
-
-        <div ref={profileRef} className="relative">
-          <button className="hidden sm:flex w-8 h-8 rounded-lg items-center justify-center flex-shrink-0" onClick={() => setProfileOpen(o => !o)} style={{ background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})` }}>
-            <span className="text-[11px] font-bold text-[#060b18]">{initials}</span>
-          </button>
-          {profileOpen && (
-            <div className="absolute right-0 top-12 w-56 rounded-xl overflow-hidden z-40 bg-surface-elevated border border-border shadow-nethra">
-              {!isSuperAdmin && (
-                <button onClick={() => { onNavigate('profile'); setProfileOpen(false); }} className="w-full text-left px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-2 text-content text-sm">
-                  <User size={14} /> <span>{t('header.profile')}</span>
-                </button>
-              )}
-              <button onClick={() => { onNavigate('settings'); setProfileOpen(false); }} className="w-full text-left px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-2 text-content text-sm">
-                <Settings size={14} /> <span>{t('header.settings')}</span>
-              </button>
-              <div className="px-4 py-3 border-t border-white/10">
-                <div className="text-[11px] text-content-secondary mb-2">Language</div>
-                <select value={language} onChange={e => setLanguage(e.target.value as typeof language)} className="w-full rounded-lg px-2 py-1.5 text-xs bg-white/[0.06] border border-white/10 text-content" style={{ colorScheme: 'dark' }}>
-                  {languages.map(opt => <option key={opt.code} value={opt.code}>{opt.label}</option>)}
-                </select>
-              </div>
-              <button onClick={handleSignOut} className="w-full text-left px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-2 border-t border-white/10 text-content text-sm">
-                <LogOut size={14} /> <span>{t('header.logout')}</span>
-              </button>
-            </div>
-          )}
+          </div>
         </div>
       </div>
-    </motion.header>
+    </header>
   );
 }

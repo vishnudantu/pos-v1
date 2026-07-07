@@ -22,6 +22,8 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: 'dist',
       emptyOutDir: true,
+      sourcemap: true,
+      chunkSizeWarningLimit: 2000,
     },
     define: {
       'import.meta.env.VITE_API_URL': JSON.stringify(apiUrl),
