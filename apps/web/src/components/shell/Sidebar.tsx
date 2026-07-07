@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronRight, PanelLeft } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { getNavigation } from './navigation'
+import { getFounderNavigation } from './founderNavigation'
 import { Role } from './types'
 
 interface SidebarProps {
@@ -15,13 +16,14 @@ interface SidebarProps {
 
 export function Sidebar({ role, activePolitician, collapsed, setCollapsed, onNavigate }: SidebarProps) {
   const location = useLocation()
-  const groups = getNavigation(role)
+  const isFounder = role === 'founder' || role === 'super_admin'
+  const groups = isFounder ? getFounderNavigation() : getNavigation(role)
 
   return (
     <aside
       className={cn(
         'hidden md:flex flex-col border-r bg-card transition-[width] duration-300 ease-in-out h-screen sticky top-0 z-30',
-        collapsed ? 'w-[72px]' : 'w-[260px]'
+        collapsed ? 'w-[72px]' : 'w-[280px]'
       )}
     >
       <div className="flex h-14 items-center justify-between border-b px-4">
@@ -40,7 +42,9 @@ export function Sidebar({ role, activePolitician, collapsed, setCollapsed, onNav
                 exit={{ opacity: 0, x: -10 }}
                 className="overflow-hidden whitespace-nowrap"
               >
-                <span className="font-semibold tracking-tight">NETHRA</span>
+                <span className="font-semibold tracking-tight">
+                  {isFounder ? 'NETHRA · GOD MODE' : 'NETHRA'}
+                </span>
               </motion.div>
             )}
           </AnimatePresence>
@@ -94,12 +98,18 @@ export function Sidebar({ role, activePolitician, collapsed, setCollapsed, onNav
       </div>
 
       <div className="border-t p-3">
-        {!collapsed && activePolitician && (
+        {!collapsed && activePolitician && !isFounder && (
           <div className="rounded-md border bg-background/50 p-2">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Active Politician</p>
             <p className="truncate text-xs font-medium">
               {activePolitician.display_name || activePolitician.full_name || 'None selected'}
             </p>
+          </div>
+        )}
+        {!collapsed && isFounder && (
+          <div className="rounded-md border border-warning/30 bg-warning/10 p-2">
+            <p className="text-[10px] uppercase tracking-wider text-warning">God Mode</p>
+            <p className="truncate text-xs font-medium">Full platform control</p>
           </div>
         )}
       </div>

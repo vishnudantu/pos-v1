@@ -55,6 +55,10 @@ import ElectionCommandCenter from './pages/ElectionCommandCenter';
 import FinancialCompliance from './pages/FinancialCompliance';
 import PartyIntegration from './pages/PartyIntegration';
 import DigitalTwin from './pages/DigitalTwin';
+import FeatureMatrix from './pages/founder/FeatureMatrix';
+import Politicians from './pages/founder/Politicians';
+import Parties from './pages/founder/Parties';
+import Integrations from './pages/founder/Integrations';
 import PoliticalHealth from './pages/founder/PoliticalHealth';
 
 function AppContent() {
@@ -80,6 +84,7 @@ function AppContent() {
       <Route element={<AppShell />}>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<DashboardRouter />} />
+        <Route path="/founder/political-health" element={<PoliticalHealth />} />
         <Route path="/morning-brief" element={<MorningBrief />} />
         <Route path="/ai-studio" element={<AIStudio />} />
         <Route path="/media" element={<Media />} />

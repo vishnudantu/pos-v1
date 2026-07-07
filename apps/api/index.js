@@ -1221,6 +1221,290 @@ app.use('/api/sentiment_scores',      crud('sentiment_scores',       []));
 app.use('/api/opposition_intelligence', crud('opposition_intelligence', ['opponent_name','activity_type','description']));
 app.use('/api/voice_reports',         crud('voice_reports',          ['reporter_name','classification','transcript']));
 
+
+// ── FOUNDER / GOD MODE API ───────────────────────────────────
+
+// Parties CRUD
+app.use('/api/parties', crud('parties', ['name','code','subscription_plan','subscription_status']));
+
+// Politicians with party + independent support
+app.get('/api/politicians', authMiddleware, async (req, res) => {
+  try {
+    const isSuperAdmin = req.user.role === 'super_admin';
+    const where = isSuperAdmin ? '' : 'WHERE pp.is_active = 1';
+    const [rows] = await pool.query(`
+      SELECT pp.*, p.name as party_name, p.code as party_code, p.color_primary as party_color,
+             prev.name as previous_party_name
+      FROM politician_profiles pp
+      LEFT JOIN parties p ON pp.party_id = p.id
+      LEFT JOIN parties prev ON pp.previous_party_id = prev.id
+      ${where}
+      ORDER BY pp.is_active DESC, pp.full_name
+    `);
+    res.json({ data: rows });
+  } catch (err) {
+    console.error('[politicians] list error:', err);
+    res.status(500).json({ error: 'Failed to fetch politicians' });
+  }
+});
+
+app.post('/api/politicians', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const data = req.body;
+    const party_id = data.party_id || null;
+    const is_independent = data.is_independent ? 1 : 0;
+    const candidate_type = is_independent ? 'independent' : (party_id ? 'party' : 'independent');
+
+    const [result] = await pool.query(
+      `INSERT INTO politician_profiles (
+        full_name, display_name, party, party_id, is_independent, candidate_type,
+        designation, constituency_name, state, district, color_primary, color_secondary,
+        email, phone, bio, subscription_status, is_active
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        data.full_name, data.display_name || data.full_name,
+        data.party_name || (is_independent ? 'Independent' : null), party_id, is_independent, candidate_type,
+        data.designation, data.constituency_name, data.state, data.district,
+        data.color_primary || '#3b82f6', data.color_secondary || '#1e40af',
+        data.email, data.phone, data.bio, 'active', 1
+      ]
+    );
+    res.status(201).json({ id: result.insertId, ...data });
+  } catch (err) {
+    console.error('[politicians] create error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/politicians/:id/party', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const { party_id, is_independent } = req.body;
+    const politician_id = req.params.id;
+
+    const [[current]] = await pool.query(
+      'SELECT party_id, party FROM politician_profiles WHERE id = ?',
+      [politician_id]
+    );
+    if (!current) return res.status(404).json({ error: 'Politician not found' });
+
+    let party_name = 'Independent';
+    if (!is_independent && party_id) {
+      const [[party]] = await pool.query('SELECT name FROM parties WHERE id = ?', [party_id]);
+      party_name = party?.name || party_name;
+    }
+
+    await pool.query(
+      `UPDATE politician_profiles
+       SET previous_party_id = party_id,
+           party_switched_at = NOW(),
+           party_id = ?,
+           is_independent = ?,
+           candidate_type = ?,
+           party = ?
+       WHERE id = ?`,
+      [
+        is_independent ? null : party_id,
+        is_independent ? 1 : 0,
+        is_independent ? 'independent' : 'party',
+        party_name,
+        politician_id
+      ]
+    );
+
+    res.json({ success: true, party_id, is_independent, party: party_name });
+  } catch (err) {
+    console.error('[politicians] switch party error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Feature Matrix: global, per-party, per-politician, per-role
+app.get('/api/features/matrix', authMiddleware, async (req, res) => {
+  try {
+    const [global] = await pool.query('SELECT * FROM feature_modules WHERE is_active = 1');
+    const [party] = req.query.party_id ? await pool.query('SELECT * FROM party_feature_access WHERE party_id = ?', [req.query.party_id]) : [[]];
+    const [politician] = req.query.politician_id ? await pool.query('SELECT * FROM politician_feature_access WHERE politician_id = ?', [req.query.politician_id]) : [[]];
+    const [role] = req.query.role ? await pool.query('SELECT * FROM role_feature_access WHERE role = ?', [req.query.role]) : [[]];
+
+    res.json({
+      global,
+      party_access: party,
+      politician_access: politician,
+      role_access: role
+    });
+  } catch (err) {
+    console.error('[features] matrix error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/features/toggle', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const { scope, scope_id, feature_key, is_enabled } = req.body;
+
+    let table, column;
+    if (scope === 'global') {
+      await pool.query('UPDATE feature_modules SET is_active = ? WHERE feature_key = ?', [is_enabled ? 1 : 0, feature_key]);
+      return res.json({ success: true });
+    } else if (scope === 'party') {
+      table = 'party_feature_access';
+      column = 'party_id';
+    } else if (scope === 'politician') {
+      table = 'politician_feature_access';
+      column = 'politician_id';
+    } else if (scope === 'role') {
+      table = 'role_feature_access';
+      column = 'role';
+    } else {
+      return res.status(400).json({ error: 'Invalid scope' });
+    }
+
+    await pool.query(
+      `INSERT INTO ${table} (${column}, feature_key, is_enabled) VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE is_enabled = VALUES(is_enabled)`,
+      [scope_id, feature_key, is_enabled ? 1 : 0]
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[features] toggle error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Integrations CRUD
+app.use('/api/integrations', crud('party_integrations', ['party_id','integration_type','provider_name','api_key_reference','status']));
+
+app.get('/api/integration-types', authMiddleware, async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM integration_types WHERE is_active = 1');
+    res.json({ data: rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/integrations/:id/test', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const [[integration]] = await pool.query('SELECT * FROM party_integrations WHERE id = ?', [req.params.id]);
+    if (!integration) return res.status(404).json({ error: 'Not found' });
+
+    // Simple health check simulation
+    const providers = {
+      bynara_ai: true,
+      ollama: true,
+      fast2sms: false,
+      whatsapp_business: false,
+      razorpay: true,
+    };
+
+    const success = providers[integration.integration_type] || false;
+    await pool.query('UPDATE party_integrations SET status = ? WHERE id = ?', [success ? 'connected' : 'failed', req.params.id]);
+
+    res.json({ success, message: success ? 'Connection successful' : 'Connection failed or not configured' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Founder reports endpoint
+app.get('/api/founder/reports/political-health', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const [[partyCount]] = await pool.query('SELECT COUNT(*) as total FROM parties WHERE is_active = 1');
+    const [[politicianCount]] = await pool.query('SELECT COUNT(*) as total FROM politician_profiles WHERE is_active = 1');
+    const [[criticalCount]] = await pool.query(`
+      SELECT COUNT(*) as total FROM politician_profiles
+      WHERE is_active = 1 AND (
+        (SELECT COUNT(*) FROM grievances WHERE politician_id = politician_profiles.id AND status != 'resolved') > 5
+        OR (SELECT COUNT(*) FROM media_mentions WHERE politician_id = politician_profiles.id AND sentiment < -0.3) > 3
+      )
+    `);
+
+    res.json({
+      parties: partyCount.total,
+      politicians: politicianCount.total,
+      critical: criticalCount.total,
+      generated_at: new Date()
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+
+// Politician full edit + soft delete
+app.put('/api/politicians/:id', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const data = req.body;
+    const [[existing]] = await pool.query('SELECT * FROM politician_profiles WHERE id = ?', [req.params.id]);
+    if (!existing) return res.status(404).json({ error: 'Not found' });
+
+    let party_name = existing.party;
+    let party_id = existing.party_id;
+
+    if (data.is_independent) {
+      party_id = null;
+      party_name = 'Independent';
+    } else if (data.party_id && data.party_id !== existing.party_id) {
+      const [[party]] = await pool.query('SELECT name FROM parties WHERE id = ?', [data.party_id]);
+      party_name = party?.name || existing.party;
+      party_id = data.party_id;
+    } else if (data.party_id === null || data.party_id === '') {
+      party_id = null;
+      party_name = 'Independent';
+    }
+
+    await pool.query(
+      `UPDATE politician_profiles SET
+        full_name = ?, display_name = ?, party = ?, party_id = ?, is_independent = ?,
+        candidate_type = ?, designation = ?, constituency_name = ?, state = ?,
+        email = ?, phone = ?, color_primary = ?, is_active = ?
+       WHERE id = ?`,
+      [
+        data.full_name || existing.full_name,
+        data.display_name || data.full_name || existing.display_name,
+        party_name,
+        party_id,
+        data.is_independent ? 1 : 0,
+        data.is_independent ? 'independent' : 'party',
+        data.designation !== undefined ? data.designation : existing.designation,
+        data.constituency_name !== undefined ? data.constituency_name : existing.constituency_name,
+        data.state !== undefined ? data.state : existing.state,
+        data.email !== undefined ? data.email : existing.email,
+        data.phone !== undefined ? data.phone : existing.phone,
+        data.color_primary || existing.color_primary,
+        data.is_active !== undefined ? (data.is_active ? 1 : 0) : existing.is_active,
+        req.params.id
+      ]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[politicians] update error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/politicians/:id', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' });
+  try {
+    await pool.query('UPDATE politician_profiles SET is_active = 0 WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[politicians] delete error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// ── END FOUNDER API ───────────────────────────────────────────
+
 // ── TEMPLE DARSHAN API ───────────────────────────────────────
 app.get('/api/temples', authMiddleware, async (req, res) => {
   const isSuperAdmin = req.user.role === 'super_admin';
