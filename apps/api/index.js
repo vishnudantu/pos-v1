@@ -1574,6 +1574,162 @@ app.delete('/api/founder/users/:id', authMiddleware, async (req, res) => {
 });
 
 
+
+
+// ── PERMISSIONS & ROLE MATRIX ─────────────────────────────────
+app.get('/api/permissions', authMiddleware, async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM permissions WHERE is_active = 1 ORDER BY category, label');
+    res.json({ data: rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/role-permissions', authMiddleware, async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM role_permissions');
+    res.json({ data: rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/role-permissions/toggle', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const { role, permission_key, is_enabled } = req.body;
+    await pool.query(
+      `INSERT INTO role_permissions (role, permission_key, is_enabled) VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE is_enabled = VALUES(is_enabled)`,
+      [role, permission_key, is_enabled ? 1 : 0]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── PUBLIC WEBSITE CONFIG ─────────────────────────────────────
+app.get('/api/founder/public-website-config', authMiddleware, async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM public_website_config');
+    res.json({ data: rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/founder/public-website-config', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const { config_key, is_enabled } = req.body;
+    await pool.query(
+      'INSERT INTO public_website_config (config_key, config_value, is_enabled) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE config_value = ?, is_enabled = ?',
+      [config_key, String(is_enabled), is_enabled ? 1 : 0, String(is_enabled), is_enabled ? 1 : 0]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── EXPORTS ────────────────────────────────────────────────────
+function toCsv(rows, columns) {
+  if (!rows || rows.length === 0) return '';
+  const header = columns.map((c) => c.label).join(',');
+  const lines = rows.map((row) =>
+    columns
+      .map((c) => {
+        const val = row[c.key];
+        if (val === null || val === undefined) return '';
+        const str = String(val).replace(/"/g, '""');
+        return `"${str}"`;
+      })
+      .join(',')
+  );
+  return [header, ...lines].join('\n');
+}
+
+app.get('/api/founder/exports/:type', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const { type } = req.params;
+    let rows = [];
+    let filename = 'export.csv';
+    let columns = [];
+
+    switch (type) {
+      case 'politicians':
+        [rows] = await pool.query(`SELECT pp.*, p.name as party_name FROM politician_profiles pp LEFT JOIN parties p ON pp.party_id = p.id ORDER BY pp.full_name`);
+        filename = 'politicians_export.csv';
+        columns = [
+          { key: 'id', label: 'ID' },
+          { key: 'full_name', label: 'Full Name' },
+          { key: 'display_name', label: 'Display Name' },
+          { key: 'party_name', label: 'Party' },
+          { key: 'designation', label: 'Designation' },
+          { key: 'constituency_name', label: 'Constituency' },
+          { key: 'state', label: 'State' },
+          { key: 'email', label: 'Email' },
+          { key: 'is_active', label: 'Active' },
+        ];
+        break;
+      case 'parties':
+        [rows] = await pool.query('SELECT * FROM parties ORDER BY name');
+        filename = 'parties_export.csv';
+        columns = [
+          { key: 'id', label: 'ID' },
+          { key: 'name', label: 'Name' },
+          { key: 'code', label: 'Code' },
+          { key: 'subscription_plan', label: 'Plan' },
+          { key: 'subscription_status', label: 'Status' },
+          { key: 'is_active', label: 'Active' },
+        ];
+        break;
+      case 'users':
+        [rows] = await pool.query('SELECT id, email, display_name, role, politician_id, is_active, last_login_at, created_at FROM users ORDER BY created_at DESC');
+        filename = 'users_export.csv';
+        columns = [
+          { key: 'id', label: 'ID' },
+          { key: 'email', label: 'Email' },
+          { key: 'display_name', label: 'Name' },
+          { key: 'role', label: 'Role' },
+          { key: 'politician_id', label: 'Politician ID' },
+          { key: 'is_active', label: 'Active' },
+          { key: 'last_login_at', label: 'Last Login' },
+        ];
+        break;
+      case 'grievances':
+        [rows] = await pool.query('SELECT * FROM grievances ORDER BY created_at DESC LIMIT 5000');
+        filename = 'grievances_export.csv';
+        columns = [
+          { key: 'id', label: 'ID' },
+          { key: 'title', label: 'Title' },
+          { key: 'citizen_name', label: 'Citizen' },
+          { key: 'status', label: 'Status' },
+          { key: 'priority', label: 'Priority' },
+          { key: 'category', label: 'Category' },
+          { key: 'created_at', label: 'Created' },
+        ];
+        break;
+      case 'full_database':
+        return res.status(400).json({ error: 'Use mysqldump for full database export' });
+      default:
+        return res.status(400).json({ error: 'Unknown export type' });
+    }
+
+    const csv = toCsv(rows, columns);
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(csv);
+  } catch (err) {
+    console.error('[exports] error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 // ── END FOUNDER API ───────────────────────────────────────────
 
 // ── TEMPLE DARSHAN API ───────────────────────────────────────

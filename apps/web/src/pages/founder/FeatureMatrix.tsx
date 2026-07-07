@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ToggleRight, Building2, UserCheck, Users, Shield } from 'lucide-react'
-import { apiGet, apiPost } from '../../lib/api'
+import { api } from '../../lib/api'
 import { Button } from '../../components/primitives/Button'
 import { Card, CardContent } from '../../components/primitives/Card'
 import { Badge } from '../../components/primitives/Badge'
@@ -12,8 +12,8 @@ import { Select } from '../../components/primitives/Select'
 interface Feature {
   id: number
   feature_key: string
-  module_name?: string
   feature_name?: string
+  module_name?: string
   description?: string
   is_active: number
 }
@@ -29,7 +29,8 @@ export default function FeatureMatrix() {
   const [globalFeatures, setGlobalFeatures] = useState<Feature[]>([])
   const [parties, setParties] = useState<any[]>([])
   const [politicians, setPoliticians] = useState<any[]>([])
-  const [loading, setLoading] = useState(false)
+  const [access, setAccess] = useState<AccessRecord[]>([])
+  const [loading, setLoading] = useState(true)
   const [savingKey, setSavingKey] = useState<string | null>(null)
 
   const [scope, setScope] = useState<'global' | 'party' | 'politician' | 'role'>('global')
@@ -39,42 +40,63 @@ export default function FeatureMatrix() {
     setScopeId('')
   }, [scope])
 
-  async function fetchData() {
-    setLoading(true)
+  async function fetchBaseData() {
     try {
-      const [fRes, pRes, polRes] = await Promise.all([
-        apiGet('/api/features/matrix'),
-        apiGet('/api/parties'),
-        apiGet('/api/politicians'),
+      const [fData, pData, polData] = await Promise.all([
+        api.get('/api/features/matrix'),
+        api.get('/api/parties'),
+        api.get('/api/politicians'),
       ])
-      const fData = await fRes.json()
-      const pData = await pRes.json()
-      const polData = await polRes.json()
-
       setGlobalFeatures(fData.global || [])
       setParties(pData.data || pData || [])
       setPoliticians(polData.data || polData || [])
     } catch (e) {
-      console.error('[features] fetch error:', e)
-    } finally {
-      setLoading(false)
+      console.error('[features] base fetch error:', e)
+    }
+  }
+
+  async function fetchAccess() {
+    if (scope === 'global') {
+      setAccess([])
+      return
+    }
+    try {
+      const params: Record<string, string> = {}
+      if (scope === 'party') params.party_id = scopeId
+      if (scope === 'politician') params.politician_id = scopeId
+      if (scope === 'role') params.role = scopeId
+
+      const query = new URLSearchParams(params).toString()
+      const data = await api.get(`/api/features/matrix${query ? '?' + query : ''}`)
+      const records = scope === 'party' ? (data.party_access || []) : scope === 'politician' ? (data.politician_access || []) : (data.role_access || [])
+      setAccess(records)
+    } catch (e) {
+      console.error('[features] access fetch error:', e)
+      setAccess([])
     }
   }
 
   useEffect(() => {
-    fetchData()
+    setLoading(true)
+    fetchBaseData().then(() => fetchAccess()).finally(() => setLoading(false))
   }, [])
 
-  async function toggleFeature(feature_key: string, current: boolean) {
+  useEffect(() => {
+    fetchAccess()
+  }, [scope, scopeId])
+
+  async function toggleFeature(feature_key: string) {
+    const current = isEnabled(feature_key)
     setSavingKey(feature_key)
     try {
-      await apiPost('/api/features/toggle', {
+      await api.post('/api/features/toggle', {
         scope,
         scope_id: scope === 'global' ? null : scopeId,
         feature_key,
         is_enabled: !current,
       })
-      await fetchData()
+      await fetchBaseData()
+      await fetchAccess()
     } catch (e) {
       console.error('[features] toggle error:', e)
       alert('Toggle failed.')
@@ -84,8 +106,13 @@ export default function FeatureMatrix() {
   }
 
   function isEnabled(featureKey: string): boolean {
-    // Simplified: for now we only show global toggle state
-    // Per-scope state would require scope-specific queries; backend supports it.
+    if (scope === 'global') {
+      const f = globalFeatures.find((x) => x.feature_key === featureKey)
+      return f ? !!f.is_active : false
+    }
+    const a = access.find((x) => x.feature_key === featureKey)
+    if (a) return !!a.is_enabled
+    // Default: inherit from global
     const f = globalFeatures.find((x) => x.feature_key === featureKey)
     return f ? !!f.is_active : false
   }
@@ -170,22 +197,20 @@ export default function FeatureMatrix() {
               return (
                 <Card key={f.id} className={enabled ? 'border-primary/30' : ''}>
                   <CardContent className="p-4">
-                    <div className="flex items-start justify-between">
+                    <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="font-medium">{f.feature_name || f.module_name || f.feature_key}</p>
                         <p className="text-xs text-muted-foreground">{f.description || 'No description'}</p>
                       </div>
-                      <div className="text-right">
-                        <Button
-                          size="sm"
-                          variant={enabled ? 'primary' : 'outline'}
-                          onClick={() => toggleFeature(f.feature_key, enabled)}
-                          loading={savingKey === f.feature_key}
-                          disabled={scope !== 'global' && !scopeId}
-                        >
-                          {enabled ? 'Enabled' : 'Disabled'}
-                        </Button>
-                      </div>
+                      <Button
+                        size="sm"
+                        variant={enabled ? 'primary' : 'outline'}
+                        onClick={() => toggleFeature(f.feature_key)}
+                        loading={savingKey === f.feature_key}
+                        disabled={scope !== 'global' && !scopeId}
+                      >
+                        {enabled ? 'Enabled' : 'Disabled'}
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
