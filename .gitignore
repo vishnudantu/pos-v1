@@ -36,3 +36,6 @@ Thumbs.db
 # Secrets
 secrets/
 credentials/
+backups/
+*.backup
+*.bak
