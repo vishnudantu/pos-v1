@@ -39,3 +39,6 @@ credentials/
 backups/
 *.backup
 *.bak
+backups/
+*.backup
+*.bak
