@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronRight, PanelLeft } from 'lucide-react'
+import { ChevronRight, PanelLeft, Eye, EyeOff } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { getNavigation } from './navigation'
 import { getFounderNavigation } from './founderNavigation'
@@ -11,13 +11,30 @@ interface SidebarProps {
   activePolitician?: { full_name?: string; display_name?: string; color_primary?: string | null } | null
   collapsed: boolean
   setCollapsed: (v: boolean) => void
+  opsMode?: boolean
+  onEnterOpsMode?: (politicianId: string) => void
+  onExitOpsMode?: () => void
   onNavigate?: () => void
 }
 
-export function Sidebar({ role, activePolitician, collapsed, setCollapsed, onNavigate }: SidebarProps) {
+export function Sidebar({
+  role,
+  activePolitician,
+  collapsed,
+  setCollapsed,
+  opsMode = false,
+  onEnterOpsMode,
+  onExitOpsMode,
+  onNavigate,
+}: SidebarProps) {
   const location = useLocation()
   const isFounder = role === 'founder' || role === 'super_admin'
-  const groups = isFounder ? getFounderNavigation() : getNavigation(role)
+
+  // In ops mode, show operational nav. For founder admin mode, show founder nav.
+  // Non-founders always use their role-based nav.
+  const groups = isFounder && !opsMode
+    ? getFounderNavigation()
+    : getNavigation(role === 'field_worker' ? 'field_worker' : 'politician_admin')
 
   return (
     <aside
@@ -43,7 +60,7 @@ export function Sidebar({ role, activePolitician, collapsed, setCollapsed, onNav
                 className="overflow-hidden whitespace-nowrap"
               >
                 <span className="font-semibold tracking-tight">
-                  {isFounder ? 'NETHRA · GOD MODE' : 'NETHRA'}
+                  {isFounder && !opsMode ? 'NETHRA · GOD MODE' : 'NETHRA'}
                 </span>
               </motion.div>
             )}
@@ -98,18 +115,35 @@ export function Sidebar({ role, activePolitician, collapsed, setCollapsed, onNav
       </div>
 
       <div className="border-t p-3">
+        {isFounder && !opsMode && !collapsed && onEnterOpsMode && (
+          <div className="space-y-2">
+            <p className="px-1 text-[10px] uppercase tracking-wider text-muted-foreground">Operations View</p>
+            <select
+              onChange={(e) => e.target.value && onEnterOpsMode(e.target.value)}
+              className="w-full rounded-md border bg-background px-2 py-1.5 text-xs"
+              defaultValue=""
+            >
+              <option value="">View as politician...</option>
+              {activePolitician && <option value={activePolitician.id}>{activePolitician.display_name || activePolitician.full_name}</option>}
+            </select>
+          </div>
+        )}
+
+        {isFounder && opsMode && !collapsed && onExitOpsMode && (
+          <button
+            onClick={onExitOpsMode}
+            className="flex w-full items-center gap-2 rounded-md border border-warning/30 bg-warning/10 p-2 text-xs font-medium text-warning hover:bg-warning/20"
+          >
+            <EyeOff className="h-3.5 w-3.5" /> Exit Operations View
+          </button>
+        )}
+
         {!collapsed && activePolitician && !isFounder && (
           <div className="rounded-md border bg-background/50 p-2">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Active Politician</p>
             <p className="truncate text-xs font-medium">
               {activePolitician.display_name || activePolitician.full_name || 'None selected'}
             </p>
-          </div>
-        )}
-        {!collapsed && isFounder && (
-          <div className="rounded-md border border-warning/30 bg-warning/10 p-2">
-            <p className="text-[10px] uppercase tracking-wider text-warning">God Mode</p>
-            <p className="truncate text-xs font-medium">Full platform control</p>
           </div>
         )}
       </div>

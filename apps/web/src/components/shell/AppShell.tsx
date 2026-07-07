@@ -8,24 +8,42 @@ import { Breadcrumbs } from './Breadcrumbs'
 import { Role } from './types'
 
 export function AppShell() {
-  const { user, activePolitician } = useAuth() as any
+  const { user, allPoliticians, activePolitician, setActivePolitician } = useAuth() as any
   const role = (user?.role || 'staff') as Role
   const [collapsed, setCollapsed] = useState(false)
+  const [opsMode, setOpsMode] = useState(false)
   const location = useLocation()
+
+  // Super admin can toggle ops mode; normal users always in ops mode
+  const isFounder = role === 'founder' || role === 'super_admin'
+  const effectiveOpsMode = isFounder ? opsMode : true
+
+  function enterOpsMode(politicianId: string) {
+    const p = allPoliticians?.find((x: any) => String(x.id) === politicianId)
+    if (p) setActivePolitician(p)
+    setOpsMode(true)
+  }
+
+  function exitOpsMode() {
+    setOpsMode(false)
+  }
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
       <Sidebar
         role={role}
-        activePolitician={activePolitician}
+        activePolitician={effectiveOpsMode ? activePolitician : undefined}
         collapsed={collapsed}
         setCollapsed={setCollapsed}
+        opsMode={effectiveOpsMode}
+        onEnterOpsMode={isFounder ? enterOpsMode : undefined}
+        onExitOpsMode={isFounder ? exitOpsMode : undefined}
       />
       <div className="flex flex-1 flex-col">
         <Header
           role={role}
           user={user}
-          activePolitician={activePolitician}
+          activePolitician={effectiveOpsMode ? activePolitician : undefined}
           notifications={3}
         />
         <main className="flex-1 overflow-y-auto">
