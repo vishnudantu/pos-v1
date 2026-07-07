@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react'
-import { Activity, Server, Database, Cpu, Lock, Globe, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react'
+import { Activity, Server, Database, Cpu, Lock, Globe, CheckCircle2, AlertTriangle, RefreshCw, DatabaseBackup, Power } from 'lucide-react'
+import { api } from '../../lib/api'
+import { Button } from '../../components/primitives/Button'
 import { Card, CardContent } from '../../components/primitives/Card'
 import { SectionCard } from '../../components/primitives/SectionCard'
 import { Badge } from '../../components/primitives/Badge'
-import { Button } from '../../components/primitives/Button'
-import { apiGet } from '../../lib/api'
+import { Loading } from '../../components/primitives/Loading'
 
 export default function SystemHealth() {
   const [health, setHealth] = useState<any>(null)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
 
   useEffect(() => {
-    apiGet('/api/health').then((r) => r.json()).then((d) => setHealth(d)).catch(() => setHealth({ status: 'error' }))
+    api.get('/api/health').then((r) => setHealth(r)).catch(() => setHealth({ status: 'error' }))
   }, [])
 
   const services = [
@@ -21,11 +23,23 @@ export default function SystemHealth() {
     { name: 'CDN / Static', status: 'ok', icon: Globe },
   ]
 
+  async function runAction(action: string) {
+    setActionLoading(action)
+    try {
+      await api.post(`/api/founder/system/${action}`)
+      alert(`${action} initiated. Refresh in a few seconds.`)
+    } catch (e) {
+      alert('Action failed')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
   return (
     <div className="mx-auto max-w-[1600px] space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">System Health</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Platform infrastructure and service status.</p>
+        <p className="text-sm text-muted-foreground">Platform infrastructure and service status.</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -55,18 +69,18 @@ export default function SystemHealth() {
             <div className="flex justify-between"><span className="text-muted-foreground">Hostname</span><span>vmi3284430</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">OS</span><span>Ubuntu 24.04 Noble</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Node.js</span><span>v20.20.2</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Web Port</span><span>4173 (static)</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Web Port</span><span>Static via Nginx</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">API Port</span><span>3002</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">SSL Expiry</span><span>Sep 2026</span></div>
           </div>
         </SectionCard>
 
-        <SectionCard title="Actions">
+        <SectionCard title="System Actions">
           <div className="flex flex-col gap-2">
-            <Button variant="outline" className="w-full justify-start" size="sm"><Activity className="mr-2 h-4 w-4" /> Restart API Service</Button>
-            <Button variant="outline" className="w-full justify-start" size="sm"><Globe className="mr-2 h-4 w-4" /> Restart Web Service</Button>
-            <Button variant="outline" className="w-full justify-start" size="sm"><Database className="mr-2 h-4 w-4" /> Backup Database</Button>
-            <Button variant="outline" className="w-full justify-start" size="sm"><Lock className="mr-2 h-4 w-4" /> Renew SSL</Button>
+            <Button variant="outline" className="w-full justify-start" size="sm" onClick={() => runAction('restart-api')} loading={actionLoading === 'restart-api'}><RefreshCw className="mr-2 h-4 w-4" /> Restart API Service</Button>
+            <Button variant="outline" className="w-full justify-start" size="sm" onClick={() => runAction('restart-web')} loading={actionLoading === 'restart-web'}><RefreshCw className="mr-2 h-4 w-4" /> Restart Web Service</Button>
+            <Button variant="outline" className="w-full justify-start" size="sm" onClick={() => runAction('backup-db')} loading={actionLoading === 'backup-db'}><DatabaseBackup className="mr-2 h-4 w-4" /> Backup Database</Button>
+            <Button variant="outline" className="w-full justify-start" size="sm" onClick={() => window.open('https://certbot.eff.org', '_blank')}><Lock className="mr-2 h-4 w-4" /> Renew SSL</Button>
           </div>
         </SectionCard>
       </div>

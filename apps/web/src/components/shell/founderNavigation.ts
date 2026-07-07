@@ -47,6 +47,7 @@ export function getFounderNavigation(): NavGroup[] {
       label: 'Platform Control',
       items: [
         { label: 'Feature Matrix', to: '/founder/features', icon: ToggleRight },
+        { label: 'Platform Settings', to: '/founder/platform-settings', icon: Settings },
         { label: 'Subscriptions', to: '/founder/subscriptions', icon: CreditCard },
         { label: 'Integrations', to: '/founder/integrations', icon: Key },
         { label: 'Audit & Exports', to: '/founder/exports', icon: Download },

@@ -1806,6 +1806,78 @@ app.get('/api/founder/reports/political-health', authMiddleware, async (req, res
 
 
 
+
+
+// ── PLATFORM SETTINGS ─────────────────────────────────────────
+app.get('/api/founder/platform-settings', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const [rows] = await pool.query('SELECT config_key, config_value FROM public_website_config');
+    const settings = {};
+    rows.forEach((r) => settings[r.config_key] = r.config_value);
+    res.json({ data: settings });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/founder/platform-settings', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const { config_key, config_value } = req.body;
+    await pool.query(
+      'INSERT INTO public_website_config (config_key, config_value, is_enabled) VALUES (?, ?, 1) ON DUPLICATE KEY UPDATE config_value = VALUES(config_value)',
+      [config_key, config_value]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── SYSTEM ACTIONS ────────────────────────────────────────────
+app.post('/api/founder/system/restart-api', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' });
+  try {
+    // Schedule restart via child process (non-blocking)
+    const { exec } = require('child_process');
+    exec('systemctl restart pos-api', (error) => {
+      if (error) console.error('[system] restart-api error:', error);
+    });
+    res.json({ success: true, message: 'API restart initiated' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/founder/system/restart-web', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const { exec } = require('child_process');
+    exec('systemctl restart pos-web', (error) => {
+      if (error) console.error('[system] restart-web error:', error);
+    });
+    res.json({ success: true, message: 'Web restart initiated' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/founder/system/backup-db', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const { exec } = require('child_process');
+    const filename = `/var/www/pos-v1-clean/backups/pos_db_backup_$(date +%Y%m%d_%H%M%S).sql`;
+    exec(`mysqldump -u pos_user -p'pos_password' --no-tablespaces pos_db > ${filename}`, (error) => {
+      if (error) console.error('[system] backup error:', error);
+    });
+    res.json({ success: true, message: 'Database backup initiated', file: filename });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 // ── END FOUNDER API ───────────────────────────────────────────
 
 // ── TEMPLE DARSHAN API ───────────────────────────────────────

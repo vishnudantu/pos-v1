@@ -55,6 +55,7 @@ import ElectionCommandCenter from './pages/ElectionCommandCenter';
 import FinancialCompliance from './pages/FinancialCompliance';
 import PartyIntegration from './pages/PartyIntegration';
 import DigitalTwin from './pages/DigitalTwin';
+import PlatformSettings from './pages/founder/PlatformSettings';
 import Constituencies from './pages/founder/Constituencies';
 import PublicWebsite from './pages/founder/PublicWebsite';
 import SystemHealth from './pages/founder/SystemHealth';
