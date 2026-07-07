@@ -1730,6 +1730,105 @@ app.get('/api/founder/exports/:type', authMiddleware, async (req, res) => {
 });
 
 
+
+
+// Real-time Political Health & Intelligence report
+app.get('/api/founder/reports/political-health', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const [[partyCount]] = await pool.query('SELECT COUNT(*) as total FROM parties WHERE is_active = 1');
+    const [[politicianCount]] = await pool.query('SELECT COUNT(*) as total FROM politician_profiles WHERE is_active = 1');
+
+    const [politicians] = await pool.query(
+      `SELECT id, full_name, display_name, party_id, party, constituency_name, state, color_primary
+       FROM politician_profiles WHERE is_active = 1 ORDER BY full_name`
+    );
+
+    const [grievances] = await pool.query('SELECT politician_id, status, priority, created_at, due_date FROM grievances');
+    const [media] = await pool.query('SELECT politician_id, sentiment, created_at FROM media_mentions');
+    const [events] = await pool.query(`SELECT politician_id, event_date FROM events WHERE event_date >= CURDATE()`);
+    const [booths] = await pool.query('SELECT politician_id, id FROM booths');
+
+    const now = new Date();
+    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+    const politicianHealth = politicians.map((p) => {
+      const polGrievances = grievances.filter((g) => g.politician_id === p.id);
+      const totalGrievances = polGrievances.length;
+      const resolved = polGrievances.filter((g) => g.status === 'resolved').length;
+      const overdue = polGrievances.filter(
+        (g) => g.status !== 'resolved' && g.status !== 'rejected' && g.due_date && new Date(g.due_date) < now
+      ).length;
+      const grievanceResolution = totalGrievances ? Math.round((resolved / totalGrievances) * 100) : 0;
+
+      const polMedia = media.filter((m) => m.politician_id === p.id);
+      const mediaMentions24h = polMedia.filter((m) => new Date(m.created_at) >= oneDayAgo).length;
+      const avgSentiment = polMedia.length
+        ? polMedia.reduce((a, m) => a + (parseFloat(m.sentiment) || 0), 0) / polMedia.length
+        : 0;
+      const sentiment = Math.max(0, Math.min(100, Math.round(((avgSentiment + 1) / 2) * 100)));
+
+      const upcomingEvents = events.filter((e) => e.politician_id === p.id).length;
+      const boothCount = booths.filter((b) => b.politician_id === p.id).length;
+      const boothStrength = Math.min(100, Math.max(30, 60 + boothCount * 2 - overdue * 3));
+
+      const negativeMedia = polMedia.filter((m) => (parseFloat(m.sentiment) || 0) < -0.3).length;
+      const redFlags = overdue + negativeMedia + (grievanceResolution < 50 ? 1 : 0);
+
+      const winningIndex = Math.min(
+        100,
+        Math.round(
+          grievanceResolution * 0.35 +
+          sentiment * 0.25 +
+          boothStrength * 0.25 +
+          Math.max(0, 100 - redFlags * 10) * 0.15
+        )
+      );
+
+      let status = 'strong';
+      if (winningIndex < 45) status = 'critical';
+      else if (winningIndex < 60) status = 'at-risk';
+      else if (winningIndex < 75) status = 'competitive';
+
+      let trend = 'flat';
+      if (sentiment > 60 && grievanceResolution > 60) trend = 'up';
+      else if (sentiment < 40 || grievanceResolution < 40) trend = 'down';
+
+      return {
+        id: p.id,
+        name: p.display_name || p.full_name,
+        constituency: p.constituency_name,
+        state: p.state,
+        party: p.party,
+        party_color: p.color_primary,
+        winningIndex,
+        sentiment,
+        grievanceResolution,
+        boothStrength,
+        mediaMentions24h,
+        redFlags,
+        upcomingEvents,
+        status,
+        trend,
+      };
+    });
+
+    res.json({
+      summary: {
+        parties: partyCount.total,
+        politicians: politicianCount.total,
+        critical: politicianHealth.filter((p) => p.status === 'critical' || p.status === 'at-risk').length,
+        generated_at: new Date(),
+      },
+      politicians: politicianHealth,
+    });
+  } catch (err) {
+    console.error('[political-health] error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 // ── END FOUNDER API ───────────────────────────────────────────
 
 // ── TEMPLE DARSHAN API ───────────────────────────────────────

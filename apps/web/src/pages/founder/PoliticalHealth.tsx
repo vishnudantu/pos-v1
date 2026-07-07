@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   TrendingUp,
   AlertOctagon,
@@ -23,6 +23,7 @@ import { Badge } from '../../components/primitives/Badge'
 import { SectionCard } from '../../components/primitives/SectionCard'
 import { StatCard } from '../../components/primitives/StatCard'
 import { Loading } from '../../components/primitives/Loading'
+import { api } from '../../lib/api'
 import {
   LineChart,
   Line,
@@ -44,27 +45,21 @@ import {
 interface PoliticianHealth {
   id: number
   name: string
-  constituency: string
-  party: string
+  constituency?: string
+  state?: string
+  party?: string
+  party_color?: string | null
   winningIndex: number
   sentiment: number
   grievanceResolution: number
   boothStrength: number
-  mediaMentions: number
+  mediaMentions24h: number
   redFlags: number
+  upcomingEvents: number
   trend: 'up' | 'down' | 'flat'
   status: 'strong' | 'competitive' | 'at-risk' | 'critical'
   lastAlert?: string
 }
-
-const DEMO_DATA: PoliticianHealth[] = [
-  { id: 1, name: 'Nara Chandrababu Naidu', constituency: 'Kuppam', party: 'TDP', winningIndex: 78, sentiment: 72, grievanceResolution: 85, boothStrength: 82, mediaMentions: 124, redFlags: 1, trend: 'up', status: 'strong', lastAlert: 'Opposition rally planned in Kuppam next week' },
-  { id: 2, name: 'Nara Lokesh', constituency: 'Mangalagiri', party: 'TDP', winningIndex: 65, sentiment: 58, grievanceResolution: 68, boothStrength: 70, mediaMentions: 89, redFlags: 3, trend: 'down', status: 'competitive', lastAlert: 'Water shortage complaints rising in 3 wards' },
-  { id: 3, name: 'Kinjarapu Ram Mohan Naidu', constituency: 'Srikakulam', party: 'TDP', winningIndex: 82, sentiment: 76, grievanceResolution: 91, boothStrength: 88, mediaMentions: 102, redFlags: 0, trend: 'up', status: 'strong' },
-  { id: 4, name: 'Appalanaidu Kalisetti', constituency: 'Vizianagaram', party: 'TDP', winningIndex: 48, sentiment: 45, grievanceResolution: 52, boothStrength: 55, mediaMentions: 67, redFlags: 5, trend: 'down', status: 'at-risk', lastAlert: 'Youth unemployment protests in Vizianagaram' },
-  { id: 5, name: 'Dr. Chandra Sekhar Pemmasani', constituency: 'Guntur', party: 'TDP', winningIndex: 71, sentiment: 69, grievanceResolution: 74, boothStrength: 76, mediaMentions: 95, redFlags: 2, trend: 'flat', status: 'competitive' },
-  { id: 6, name: 'Magunta Sreenivasulu Reddy', constituency: 'Ongole', party: 'TDP', winningIndex: 42, sentiment: 38, grievanceResolution: 41, boothStrength: 48, mediaMentions: 54, redFlags: 7, trend: 'down', status: 'critical', lastAlert: 'Caste equations shifting against party in Ongole' },
-]
 
 const SENTIMENT_DATA = [
   { day: 'Mon', positive: 65, negative: 25, neutral: 10 },
@@ -83,23 +78,6 @@ const BOOTH_DATA = [
   { name: 'Critical', value: 31 },
 ]
 
-const RADAR_DATA = [
-  { metric: 'Sentiment', A: 70, fullMark: 100 },
-  { metric: 'Booth Strength', A: 75, fullMark: 100 },
-  { metric: 'Grievance Resolution', A: 82, fullMark: 100 },
-  { metric: 'Media Presence', A: 68, fullMark: 100 },
-  { metric: 'Ground Activity', A: 60, fullMark: 100 },
-  { metric: 'Opposition Weakness', A: 55, fullMark: 100 },
-]
-
-const RED_FLAGS = [
-  { id: 1, politician: 'Magunta Sreenivasulu Reddy', issue: 'Caste equations shifting', severity: 'critical', type: 'Demographic' },
-  { id: 2, politician: 'Appalanaidu Kalisetti', issue: 'Youth unemployment protests', severity: 'high', type: 'Grievance' },
-  { id: 3, politician: 'Nara Lokesh', issue: 'Water shortage complaints', severity: 'medium', type: 'Service' },
-  { id: 4, politician: 'Nara Chandrababu Naidu', issue: 'Opposition rally planned', severity: 'low', type: 'Political' },
-  { id: 5, politician: 'Appalanaidu Kalisetti', issue: 'Negative media coverage spike', severity: 'high', type: 'Media' },
-]
-
 function StatusBadge({ status }: { status: string }) {
   const variants: Record<string, 'success' | 'warning' | 'danger' | 'secondary'> = {
     strong: 'success',
@@ -116,36 +94,45 @@ function TrendIcon({ trend }: { trend: string }) {
   return <Minus className="h-4 w-4 text-muted-foreground" />
 }
 
-function SeverityBadge({ severity }: { severity: string }) {
-  const variants: Record<string, 'danger' | 'warning' | 'info' | 'secondary'> = {
-    critical: 'danger',
-    high: 'warning',
-    medium: 'info',
-    low: 'secondary',
-  }
-  return <Badge variant={variants[severity] || 'secondary'}>{severity.toUpperCase()}</Badge>
-}
-
 export default function PoliticalHealth() {
+  const [politicians, setPoliticians] = useState<PoliticianHealth[]>([])
+  const [summary, setSummary] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'strong' | 'competitive' | 'at-risk' | 'critical'>('all')
   const [generating, setGenerating] = useState(false)
 
+  async function fetchData() {
+    setLoading(true)
+    try {
+      const data = await api.get('/api/founder/reports/political-health')
+      setPoliticians(data.politicians || [])
+      setSummary(data.summary || null)
+    } catch (e) {
+      console.error('[political-health] fetch error:', e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchData()
+  }, [])
+
   const filteredData = useMemo(() => {
-    if (filter === 'all') return DEMO_DATA
-    return DEMO_DATA.filter((p) => p.status === filter)
-  }, [filter])
+    if (filter === 'all') return politicians
+    return politicians.filter((p) => p.status === filter)
+  }, [politicians, filter])
 
   const averages = useMemo(() => {
-    const n = DEMO_DATA.length
+    const n = politicians.length || 1
     return {
-      winningIndex: Math.round(DEMO_DATA.reduce((a, b) => a + b.winningIndex, 0) / n),
-      sentiment: Math.round(DEMO_DATA.reduce((a, b) => a + b.sentiment, 0) / n),
-      grievanceResolution: Math.round(DEMO_DATA.reduce((a, b) => a + b.grievanceResolution, 0) / n),
-      boothStrength: Math.round(DEMO_DATA.reduce((a, b) => a + b.boothStrength, 0) / n),
-      redFlags: DEMO_DATA.reduce((a, b) => a + b.redFlags, 0),
-      critical: DEMO_DATA.filter((p) => p.status === 'critical' || p.status === 'at-risk').length,
+      winningIndex: Math.round(politicians.reduce((a, b) => a + b.winningIndex, 0) / n),
+      sentiment: Math.round(politicians.reduce((a, b) => a + b.sentiment, 0) / n),
+      boothStrength: Math.round(politicians.reduce((a, b) => a + b.boothStrength, 0) / n),
+      redFlags: politicians.reduce((a, b) => a + b.redFlags, 0),
+      critical: politicians.filter((p) => p.status === 'critical' || p.status === 'at-risk').length,
     }
-  }, [])
+  }, [politicians])
 
   function generateReport() {
     setGenerating(true)
@@ -155,7 +142,15 @@ export default function PoliticalHealth() {
     }, 1500)
   }
 
-  if (generating) return <Loading text="Generating comprehensive political health report..." />
+  function severityAlert(p: PoliticianHealth): string | undefined {
+    if (p.redFlags >= 5) return 'Multiple red flags detected'
+    if (p.grievanceResolution < 50) return 'Grievance resolution rate falling'
+    if (p.sentiment < 40) return 'Negative sentiment trend'
+    if (p.boothStrength < 55) return 'Weak booth coverage'
+    return undefined
+  }
+
+  if (loading) return <Loading text="Loading political health intelligence..." className="min-h-[60vh]" />
 
   return (
     <div className="mx-auto max-w-[1600px] space-y-6">
@@ -170,15 +165,14 @@ export default function PoliticalHealth() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline"><Filter className="mr-2 h-4 w-4" /> Filter</Button>
-          <Button size="sm" variant="outline"><RefreshCw className="mr-2 h-4 w-4" /> Refresh</Button>
+          <Button size="sm" variant="outline" onClick={fetchData}><RefreshCw className="mr-2 h-4 w-4" /> Refresh</Button>
           <Button size="sm" onClick={generateReport} loading={generating}><Download className="mr-2 h-4 w-4" /> Generate Report</Button>
         </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard label="Politicians" value={summary?.politicians ?? 0} icon={Users} delta={summary?.parties} deltaLabel="parties" />
         <StatCard label="Avg Winning Index" value={averages.winningIndex} icon={TrendingUp} delta={5} deltaLabel="vs last week" />
-        <StatCard label="Avg Sentiment" value={`${averages.sentiment}%`} icon={Newspaper} delta={-2} deltaLabel="vs last week" />
         <StatCard label="Avg Booth Strength" value={`${averages.boothStrength}%`} icon={MapPin} delta={3} deltaLabel="vs target" />
         <StatCard label="Red Flags" value={averages.redFlags} icon={AlertOctagon} delta={averages.critical} deltaLabel="critical" />
       </div>
@@ -208,8 +202,11 @@ export default function PoliticalHealth() {
                 <CardContent className="p-4">
                   <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                     <div className="flex items-start gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-                        {p.name.split(' ').pop()?.[0]}
+                      <div
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white"
+                        style={{ background: p.party_color || 'hsl(var(--primary))' }}
+                      >
+                        {(p.name?.split(' ').pop() || 'P')[0]}
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
@@ -217,13 +214,17 @@ export default function PoliticalHealth() {
                           <StatusBadge status={p.status} />
                           <TrendIcon trend={p.trend} />
                         </div>
-                        <p className="text-xs text-muted-foreground">{p.constituency} · {p.party}</p>
-                        {p.lastAlert && (
-                          <div className="mt-1 flex items-center gap-1 text-xs text-warning">
-                            <Bell className="h-3 w-3" />
-                            {p.lastAlert}
-                          </div>
-                        )}
+                        <p className="text-xs text-muted-foreground">
+                          {p.constituency}{p.constituency && p.state ? ', ' : ''}{p.state}{p.party ? ` · ${p.party}` : ''}
+                        </p>
+                        {(() => {
+                          const alert = severityAlert(p)
+                          return alert ? (
+                            <div className="mt-1 flex items-center gap-1 text-xs text-warning">
+                              <Bell className="h-3 w-3" />{alert}
+                            </div>
+                          ) : null
+                        })()}
                       </div>
                     </div>
                     <div className="grid grid-cols-4 gap-2 md:gap-4">
@@ -252,18 +253,20 @@ export default function PoliticalHealth() {
         </SectionCard>
 
         <div className="space-y-6">
-          <SectionCard title="Red Flag Alerts" description="Issues requiring founder attention" action={<Badge variant="danger">{RED_FLAGS.length} open</Badge>}>
+          <SectionCard title="Red Flag Alerts" description="Issues requiring founder attention" action={<Badge variant="danger">{filteredData.filter((p) => p.redFlags > 0).length} open</Badge>}>
             <div className="space-y-2">
-              {RED_FLAGS.map((r) => (
-                <div key={r.id} className="rounded-md border p-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs text-muted-foreground">{r.politician}</p>
-                    <SeverityBadge severity={r.severity} />
+              {filteredData
+                .filter((p) => p.redFlags > 0)
+                .slice(0, 6)
+                .map((p) => (
+                  <div key={p.id} className="rounded-md border p-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-muted-foreground">{p.name}</p>
+                      <Badge variant={p.redFlags > 4 ? 'danger' : 'warning'}>{p.redFlags} flags</Badge>
+                    </div>
+                    <p className="mt-1 text-sm font-medium">{severityAlert(p) || 'Attention needed'}</p>
                   </div>
-                  <p className="mt-1 text-sm font-medium">{r.issue}</p>
-                  <p className="text-xs text-muted-foreground">{r.type}</p>
-                </div>
-              ))}
+                ))}
             </div>
           </SectionCard>
 
@@ -306,7 +309,13 @@ export default function PoliticalHealth() {
         <SectionCard title="Composite Strength Radar">
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <RadarChart cx="50%" cy="50%" outerRadius="80%" data={RADAR_DATA}>
+              <RadarChart cx="50%" cy="50%" outerRadius="80%" data={[
+                { metric: 'Sentiment', A: averages.sentiment, fullMark: 100 },
+                { metric: 'Booth Strength', A: averages.boothStrength, fullMark: 100 },
+                { metric: 'Grievance Resolution', A: Math.round(politicians.reduce((a,b)=>a+b.grievanceResolution,0)/(politicians.length||1)), fullMark: 100 },
+                { metric: 'Media Presence', A: Math.min(100, Math.round(politicians.reduce((a,b)=>a+b.mediaMentions24h,0)/(politicians.length||1)*10)), fullMark: 100 },
+                { metric: 'Winning Index', A: averages.winningIndex, fullMark: 100 },
+              ]}>
                 <PolarGrid stroke="hsl(var(--border))" />
                 <PolarAngleAxis dataKey="metric" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} />
                 <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }} />
@@ -321,19 +330,19 @@ export default function PoliticalHealth() {
           <div className="space-y-3">
             <div className="flex items-start gap-2 text-sm">
               <Activity className="mt-0.5 h-4 w-4 text-info" />
-              <p>3 politicians show declining sentiment over 7 days.</p>
+              <p>{politicians.filter((p) => p.trend === 'down').length} politicians show declining health.</p>
             </div>
             <div className="flex items-start gap-2 text-sm">
               <Flag className="mt-0.5 h-4 w-4 text-warning" />
-              <p>Booth strength below 60% in 95 booths across 4 constituencies.</p>
+              <p>Booth strength below 60% in {politicians.filter((p) => p.boothStrength < 60).length} politician records.</p>
             </div>
             <div className="flex items-start gap-2 text-sm">
               <MessageSquareWarning className="mt-0.5 h-4 w-4 text-danger" />
-              <p>Water and unemployment grievances spiked 34% this week.</p>
+              <p>{averages.redFlags} active red flags across the platform.</p>
             </div>
             <div className="flex items-start gap-2 text-sm">
               <Newspaper className="mt-0.5 h-4 w-4 text-success" />
-              <p>Positive coverage on education and health initiatives.</p>
+              <p>{politicians.filter((p) => p.sentiment > 60).length} politicians have positive sentiment.</p>
             </div>
           </div>
           <Button className="mt-4 w-full" size="sm" variant="outline">

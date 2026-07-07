@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Pencil, Trash2, Users, ArrowRightLeft, UserX } from 'lucide-react'
+import { Plus, Pencil, Trash2, Users, ArrowRightLeft, UserX, History } from 'lucide-react'
 import { apiGet, apiPost, apiPut, apiDelete } from '../../lib/api'
 import { Button } from '../../components/primitives/Button'
 import { Card, CardContent } from '../../components/primitives/Card'
@@ -28,7 +28,10 @@ interface Politician {
   state?: string
   email?: string
   phone?: string
+  color_primary?: string
   is_active: number
+  previous_party_name?: string
+  party_switched_at?: string
 }
 
 export default function Politicians() {
@@ -106,9 +109,7 @@ export default function Politicians() {
     if (!form.full_name) return alert('Full name is required')
 
     const payload = { ...form }
-    if (payload.is_independent) {
-      payload.party_id = null
-    }
+    if (payload.is_independent) payload.party_id = null
 
     setSaving(true)
     try {
@@ -146,7 +147,7 @@ export default function Politicians() {
   }
 
   async function handleDelete(id: number) {
-    if (!confirm('Are you sure? This will deactivate the politician.')) return
+    if (!confirm('Deactivate this politician?')) return
     try {
       await apiDelete(`/api/politicians/${id}`)
       await fetchData()
@@ -174,7 +175,7 @@ export default function Politicians() {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-semibold tracking-tight">Politicians</h1>
-            <Badge variant="outline">Tenants</Badge>
+            <Badge variant="outline">Tenants & Entities</Badge>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
             Deploy politicians, assign them to party buckets, switch parties, or mark independent.
@@ -208,7 +209,7 @@ export default function Politicians() {
                     <div className="flex items-start gap-3">
                       <div
                         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white"
-                        style={{ background: p.party_color || p.party_id ? '#3b82f6' : '#64748b' }}
+                        style={{ background: p.party_color || p.color_primary || (p.party_id ? '#3b82f6' : '#64748b') }}
                       >
                         {p.is_independent ? 'I' : (p.party_code || 'P')}
                       </div>
@@ -225,6 +226,12 @@ export default function Politicians() {
                         <p className="text-xs text-muted-foreground">
                           {p.designation}{p.designation && p.constituency_name ? ' · ' : ''}{p.constituency_name}{p.state ? `, ${p.state}` : ''}
                         </p>
+                        {p.previous_party_name && (
+                          <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                            <History className="h-3 w-3" />
+                            Switched from {p.previous_party_name} {p.party_switched_at ? `on ${new Date(p.party_switched_at).toLocaleDateString('en-IN')}` : ''}
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -250,61 +257,21 @@ export default function Politicians() {
         )}
       </SectionCard>
 
-      {/* Deploy / Edit Modal */}
-      <Modal
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        title={editing ? 'Edit Politician' : 'Deploy Politician'}
-        description="Fill in politician details and assign to a party."
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave} loading={saving}>Save</Button>
-          </>
-        }
-      >
+      <Modal open={dialogOpen} onOpenChange={setDialogOpen} title={editing ? 'Edit Politician' : 'Deploy Politician'} description="Fill in politician details and assign to a party." footer={<><Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button><Button onClick={handleSave} loading={saving}>Save</Button></>}>
         <div className="grid gap-4">
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">Full Name <span className="text-danger">*</span></label>
-            <Input value={form.full_name || ''} onChange={(e) => update('full_name', e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">Display Name</label>
-            <Input value={form.display_name || ''} onChange={(e) => update('display_name', e.target.value)} />
+          <div className="space-y-1.5"><label className="text-sm font-medium">Full Name <span className="text-danger">*</span></label><Input value={form.full_name || ''} onChange={(e) => update('full_name', e.target.value)} /></div>
+          <div className="space-y-1.5"><label className="text-sm font-medium">Display Name</label><Input value={form.display_name || ''} onChange={(e) => update('display_name', e.target.value)} /></div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5"><label className="text-sm font-medium">Party</label><Select value={form.party_id || ''} onChange={(e) => update('party_id', e.target.value)} options={activeParties.map((p) => ({ label: p.name, value: String(p.id) }))} /></div>
+            <div className="space-y-1.5"><label className="text-sm font-medium">Designation</label><Input value={form.designation || ''} onChange={(e) => update('designation', e.target.value)} placeholder="MLA / MP" /></div>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Party</label>
-              <Select
-                value={form.party_id || ''}
-                onChange={(e) => update('party_id', e.target.value)}
-                options={activeParties.map((p) => ({ label: p.name, value: String(p.id) }))}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Designation</label>
-              <Input value={form.designation || ''} onChange={(e) => update('designation', e.target.value)} placeholder="MLA / MP" />
-            </div>
+            <div className="space-y-1.5"><label className="text-sm font-medium">Constituency</label><Input value={form.constituency_name || ''} onChange={(e) => update('constituency_name', e.target.value)} /></div>
+            <div className="space-y-1.5"><label className="text-sm font-medium">State</label><Input value={form.state || ''} onChange={(e) => update('state', e.target.value)} /></div>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Constituency</label>
-              <Input value={form.constituency_name || ''} onChange={(e) => update('constituency_name', e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">State</label>
-              <Input value={form.state || ''} onChange={(e) => update('state', e.target.value)} />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Email</label>
-              <Input type="email" value={form.email || ''} onChange={(e) => update('email', e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Phone</label>
-              <Input value={form.phone || ''} onChange={(e) => update('phone', e.target.value)} />
-            </div>
+            <div className="space-y-1.5"><label className="text-sm font-medium">Email</label><Input type="email" value={form.email || ''} onChange={(e) => update('email', e.target.value)} /></div>
+            <div className="space-y-1.5"><label className="text-sm font-medium">Phone</label><Input value={form.phone || ''} onChange={(e) => update('phone', e.target.value)} /></div>
           </div>
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Primary Color</label>
@@ -313,43 +280,18 @@ export default function Politicians() {
               <Input value={form.color_primary || ''} onChange={(e) => update('color_primary', e.target.value)} className="flex-1" />
             </div>
           </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={!!form.is_independent} onChange={(e) => update('is_independent', e.target.checked)} className="h-4 w-4 rounded border-input" />
-            Mark as Independent
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={!!form.is_active} onChange={(e) => update('is_active', e.target.checked)} className="h-4 w-4 rounded border-input" />
-            Active
-          </label>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!form.is_independent} onChange={(e) => update('is_independent', e.target.checked)} className="h-4 w-4 rounded border-input" /> Mark as Independent</label>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!form.is_active} onChange={(e) => update('is_active', e.target.checked)} className="h-4 w-4 rounded border-input" /> Active</label>
         </div>
       </Modal>
 
-      {/* Switch Party Modal */}
-      <Modal
-        open={partySwitchOpen}
-        onOpenChange={setPartySwitchOpen}
-        title={switching ? `Switch Party: ${switching.display_name || switching.full_name}` : 'Switch Party'}
-        description="Move to another party or make independent."
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setPartySwitchOpen(false)}>Cancel</Button>
-            <Button onClick={handlePartySwitch} loading={saving}>Confirm Switch</Button>
-          </>
-        }
-      >
+      <Modal open={partySwitchOpen} onOpenChange={setPartySwitchOpen} title={switching ? `Switch Party: ${switching.display_name || switching.full_name}` : 'Switch Party'} description="Move to another party or make independent." footer={<><Button variant="outline" onClick={() => setPartySwitchOpen(false)}>Cancel</Button><Button onClick={handlePartySwitch} loading={saving}>Confirm Switch</Button></>}>
         <div className="space-y-4">
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={!!form.is_independent} onChange={(e) => update('is_independent', e.target.checked)} className="h-4 w-4 rounded border-input" />
-            Independent Candidate
-          </label>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!form.is_independent} onChange={(e) => update('is_independent', e.target.checked)} className="h-4 w-4 rounded border-input" /> Independent Candidate</label>
           {!form.is_independent && (
             <div className="space-y-1.5">
               <label className="text-sm font-medium">New Party</label>
-              <Select
-                value={form.party_id || ''}
-                onChange={(e) => update('party_id', e.target.value)}
-                options={activeParties.map((p) => ({ label: p.name, value: String(p.id) }))}
-              />
+              <Select value={form.party_id || ''} onChange={(e) => update('party_id', e.target.value)} options={activeParties.map((p) => ({ label: p.name, value: String(p.id) }))} />
             </div>
           )}
         </div>

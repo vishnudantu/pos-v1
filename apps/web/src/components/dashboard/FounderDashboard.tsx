@@ -1,135 +1,171 @@
 import {
   Users,
   Shield,
-  Map,
-  Megaphone,
-  Wallet,
-  Key,
-  Cpu,
+  Building2,
   ToggleRight,
+  Key,
   Download,
   Activity,
   Plus,
   Settings,
-  AlertTriangle,
   CheckCircle2,
-  Sparkles,
-  Smartphone,
-  Newspaper,
-  Landmark,
+  CreditCard,
   Globe,
+  AlertTriangle,
+  Cpu,
   Lock,
+  Bot,
+  MessageSquareWarning,
+  Sparkles,
+  Newspaper,
+  Smartphone,
+  Landmark,
 } from 'lucide-react'
-import { StatCard } from '../primitives/StatCard'
-import { SectionCard } from '../primitives/SectionCard'
-import { Button } from '../primitives/Button'
-import { Badge } from '../primitives/Badge'
-import { EmptyState } from '../primitives/EmptyState'
+import { useEffect, useMemo, useState } from 'react'
+import { StatCard } from '../components/primitives/StatCard'
+import { SectionCard } from '../components/primitives/SectionCard'
+import { Button } from '../components/primitives/Button'
+import { Badge } from '../components/primitives/Badge'
+import { EmptyState } from '../components/primitives/EmptyState'
+import { Loading } from '../components/primitives/Loading'
 import { DashboardLayout } from './DashboardLayout'
-import { useDashboardCommand } from './useDashboardCommand'
+import { api } from '../../lib/api'
 
-const FEATURES = [
-  { id: 'ai-studio', label: 'AI Studio', icon: Sparkles, enabled: true },
-  { id: 'omniscan', label: 'OmniScan Media', icon: Newspaper, enabled: true },
-  { id: 'whatsapp', label: 'WhatsApp Intel', icon: Smartphone, enabled: false },
-  { id: 'darshan', label: 'Tirupati Darshan', icon: Landmark, enabled: true },
-  { id: 'grievances', label: 'Grievance Center', icon: AlertTriangle, enabled: true },
-  { id: 'booths', label: 'Booth Management', icon: Map, enabled: true },
-  { id: 'voters', label: 'Voter Database', icon: Users, enabled: false },
-  { id: 'content-factory', label: 'Content Factory', icon: Megaphone, enabled: false },
-]
-
-const POLITICIANS = [
-  { name: 'Nara Chandrababu Naidu', role: 'Party President', state: 'Andhra Pradesh', active: true },
-  { name: 'Nara Lokesh', role: 'MLA', state: 'Andhra Pradesh', active: true },
-  { name: 'Kinjarapu Ram Mohan Naidu', role: 'MP', state: 'Andhra Pradesh', active: true },
-  { name: 'Appalanaidu Kalisetti', role: 'MP', state: 'Andhra Pradesh', active: false },
-]
-
-const INTEGRATIONS = [
-  { name: 'Bynara AI', status: 'connected', type: 'AI' },
-  { name: 'Ollama Local', status: 'connected', type: 'AI' },
-  { name: 'Fast2SMS', status: 'pending', type: 'SMS' },
-  { name: 'WhatsApp Business', status: 'disabled', type: 'Messaging' },
+const ALL_FEATURES = [
+  { id: 'ai-studio', label: 'AI Studio', icon: Sparkles, description: 'Prompts, agents, training' },
+  { id: 'omniscan', label: 'OmniScan Media', icon: Newspaper, description: 'RSS + news monitoring' },
+  { id: 'whatsapp-intel', label: 'WhatsApp Intelligence', icon: Smartphone, description: 'Group ingestion + classification' },
+  { id: 'darshan', label: 'Tirupati Darshan', icon: Landmark, description: 'Temple booking workflow' },
+  { id: 'grievances', label: 'Grievance Center', icon: MessageSquareWarning, description: 'Citizen issue tracking' },
+  { id: 'booths', label: 'Booth Management', icon: Users, description: 'Karyakarta + voter mapping' },
+  { id: 'voters', label: 'Voter Database', icon: Shield, description: 'Import + predictive scoring' },
+  { id: 'content-factory', label: 'Content Factory', icon: Cpu, description: 'AI generated content' },
+  { id: 'agent-system', label: 'Auto Agents', icon: Bot, description: 'Autonomous task agents' },
+  { id: 'deepfake-shield', label: 'Deepfake Shield', icon: Lock, description: 'Misinformation defense' },
 ]
 
 export function FounderDashboard() {
-  const { data, loading } = useDashboardCommand()
+  const [parties, setParties] = useState<any[]>([])
+  const [users, setUsers] = useState<any[]>([])
+  const [politicians, setPoliticians] = useState<any[]>([])
+  const [integrations, setIntegrations] = useState<any[]>([])
+  const [globalFeatures, setGlobalFeatures] = useState<any[]>([])
+  const [health, setHealth] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  async function fetchData() {
+    setLoading(true)
+    try {
+      const [pRes, uRes, polRes, iRes, fRes, hRes] = await Promise.all([
+        api.get('/api/parties'),
+        api.get('/api/founder/users'),
+        api.get('/api/politicians'),
+        api.get('/api/integrations'),
+        api.get('/api/features/matrix'),
+        api.get('/api/founder/reports/political-health'),
+      ])
+      setParties(pRes.data || pRes || [])
+      setUsers(uRes.data || uRes || [])
+      setPoliticians(polRes.data || polRes || [])
+      setIntegrations(iRes.data || iRes || [])
+      setGlobalFeatures(fRes.global || [])
+      setHealth(hRes.summary || null)
+    } catch (e) {
+      console.error('[founder-dashboard] fetch error:', e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchData()
+  }, [])
+
+  const enabledCount = useMemo(() => {
+    return globalFeatures.filter((f) => f.is_active).length
+  }, [globalFeatures])
+
+  const connectedIntegrations = useMemo(() => integrations.filter((i) => i.status === 'connected').length, [integrations])
 
   return (
     <DashboardLayout
       title="Founder Command Center"
-      subtitle="Deploy politicians, manage features, control integrations, and export everything."
-      badge="Party President"
+      subtitle="Deploy parties, control features, manage subscriptions, and export everything."
+      badge="God Mode"
       actions={
         <>
           <Button size="sm" variant="outline"><Globe className="mr-2 h-4 w-4" /> Public View</Button>
-          <Button size="sm" variant="outline"><Download className="mr-2 h-4 w-4" /> Export</Button>
-          <Button size="sm"><Plus className="mr-2 h-4 w-4" /> Deploy Politician</Button>
+          <Button size="sm" variant="outline"><Download className="mr-2 h-4 w-4" /> Export All</Button>
+          <Button size="sm"><Plus className="mr-2 h-4 w-4" /> Deploy Party</Button>
         </>
       }
       loading={loading}
       stats={
         <>
-          <StatCard label="Politicians Deployed" value={data?.totalPoliticians ?? 24} icon={Shield} delta={4} deltaLabel="this month" />
-          <StatCard label="Active Staff" value={data?.activeUsers ?? 142} icon={Users} delta={18} deltaLabel="this week" />
-          <StatCard label="Features Enabled" value="5/8" icon={ToggleRight} deltaLabel="modules" />
-          <StatCard label="AI Credits Used" value="82%" icon={Cpu} delta={12} deltaLabel="vs last week" />
+          <StatCard label="Parties" value={parties.length} icon={Building2} delta={parties.filter((p) => p.subscription_status === 'active').length} deltaLabel="active" />
+          <StatCard label="Politicians" value={politicians.length} icon={Shield} delta={politicians.filter((p) => p.is_active).length} deltaLabel="active" />
+          <StatCard label="Active Users" value={users.filter((u) => u.is_active).length} icon={Users} delta={users.length} deltaLabel="total" />
+          <StatCard label="Features Enabled" value={`${enabledCount}/${ALL_FEATURES.length}`} icon={ToggleRight} deltaLabel="globally" />
         </>
       }
     >
       <div className="lg:col-span-2 space-y-6">
-        {/* Politicians */}
         <SectionCard
-          title="Politicians & Deployments"
-          description="Active politicians under your organization"
-          action={<Button size="sm" variant="outline"><Plus className="mr-2 h-4 w-4" /> Add</Button>}
+          title="Party Deployments"
+          description="Parties subscribed to the platform"
+          action={<Button size="sm" variant="outline"><Plus className="mr-2 h-4 w-4" /> Add Party</Button>}
         >
           <div className="space-y-2">
-            {POLITICIANS.map((p) => (
-              <div key={p.name} className="flex items-center justify-between rounded-md border p-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-                    {p.name.split(' ').pop()?.[0]}
+            {parties.length === 0 ? (
+              <EmptyState icon={Building2} title="No parties deployed" description="Create a party to begin." />
+            ) : (
+              parties.map((p) => (
+                <div key={p.id} className="flex items-center justify-between rounded-md border p-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary/10 text-sm font-semibold text-primary">
+                      {p.code || p.name?.slice(0, 2).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">{p.name}</p>
+                      <p className="text-xs text-muted-foreground">{p.politicians_count ?? 0} politicians · {p.users_count ?? 0} users · {p.subscription_plan || 'trial'} plan</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-medium">{p.name}</p>
-                    <p className="text-xs text-muted-foreground">{p.role} · {p.state}</p>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={p.subscription_status === 'active' ? 'success' : 'warning'}>{p.subscription_status}</Badge>
+                    <Button variant="ghost" size="icon" className="h-8 w-8"><Settings className="h-4 w-4" /></Button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant={p.active ? 'success' : 'secondary'}>
-                    {p.active ? 'Active' : 'Paused'}
-                  </Badge>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <Settings className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </SectionCard>
 
-        {/* Feature Control */}
         <SectionCard
-          title="Feature Control"
-          description="Enable or disable modules across the platform"
-          action={<Badge variant="info">Global</Badge>}
+          title="Global Feature Matrix"
+          description="Control feature availability across all tenants"
+          action={
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline">Per-Party</Button>
+              <Button size="sm" variant="outline">Per-Role</Button>
+            </div>
+          }
         >
           <div className="grid gap-3 sm:grid-cols-2">
-            {FEATURES.map((f) => {
+            {ALL_FEATURES.map((f) => {
               const Icon = f.icon
+              const enabled = globalFeatures.some((g) => g.feature_key === f.id && g.is_active)
               return (
-                <div key={f.id} className="flex items-center justify-between rounded-md border p-3">
-                  <div className="flex items-center gap-3">
+                <div key={f.id} className="flex items-start justify-between rounded-md border p-3">
+                  <div className="flex items-start gap-3">
                     <div className="rounded-md bg-muted p-2">
                       <Icon className="h-4 w-4 text-muted-foreground" />
                     </div>
-                    <span className="text-sm font-medium">{f.label}</span>
+                    <div>
+                      <p className="text-sm font-medium">{f.label}</p>
+                      <p className="text-xs text-muted-foreground">{f.description}</p>
+                    </div>
                   </div>
-                  <Badge variant={f.enabled ? 'success' : 'secondary'}>
-                    {f.enabled ? 'Enabled' : 'Disabled'}
-                  </Badge>
+                  <Badge variant={enabled ? 'success' : 'secondary'}>{enabled ? 'Enabled' : 'Disabled'}</Badge>
                 </div>
               )
             })}
@@ -138,85 +174,49 @@ export function FounderDashboard() {
       </div>
 
       <div className="space-y-6">
-        {/* Integrations */}
         <SectionCard
-          title="API Keys & Integrations"
-          description="Connected services and credentials"
-          action={<Button size="sm" variant="outline"><Key className="mr-2 h-4 w-4" /> Manage</Button>}
+          title="Platform Health"
+          description="Political and system status"
+          action={<Badge variant={health?.critical ? 'warning' : 'success'}>{health?.critical ? `${health.critical} critical` : 'Healthy'}</Badge>}
         >
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between"><span>Politicians</span><span className="font-medium">{health?.politicians ?? 0}</span></div>
+            <div className="flex justify-between"><span>Parties</span><span className="font-medium">{health?.parties ?? 0}</span></div>
+            <div className="flex justify-between"><span>Critical Alerts</span><span className={health?.critical ? 'font-medium text-danger' : 'font-medium'}>{health?.critical ?? 0}</span></div>
+            <div className="flex justify-between"><span>Integrations</span><span className="font-medium">{connectedIntegrations}/{integrations.length} connected</span></div>
+            <div className="flex justify-between"><span>API</span><span className="text-success">Operational</span></div>
+            <div className="flex justify-between"><span>Database</span><span className="text-success">Connected</span></div>
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Integrations" description="Connected services" action={<Button size="sm" variant="outline"><Key className="mr-2 h-4 w-4" /> Manage</Button>}>
           <div className="space-y-2">
-            {INTEGRATIONS.map((i) => (
-              <div key={i.name} className="flex items-center justify-between rounded-md border p-3">
-                <div>
-                  <p className="text-sm font-medium">{i.name}</p>
-                  <p className="text-xs text-muted-foreground">{i.type}</p>
+            {integrations.length === 0 ? (
+              <EmptyState icon={Key} title="No integrations" description="Add AI, SMS, payment, or messaging integrations." />
+            ) : (
+              integrations.slice(0, 5).map((i) => (
+                <div key={i.id} className="flex items-center justify-between rounded-md border p-3">
+                  <div>
+                    <p className="text-sm font-medium">{i.provider_name || i.integration_type}</p>
+                    <p className="text-xs text-muted-foreground">{i.integration_type}</p>
+                  </div>
+                  <Badge variant={i.status === 'connected' ? 'success' : i.status === 'pending' ? 'warning' : 'secondary'}>{i.status}</Badge>
                 </div>
-                <Badge
-                  variant={
-                    i.status === 'connected' ? 'success' : i.status === 'pending' ? 'warning' : 'secondary'
-                  }
-                >
-                  {i.status}
-                </Badge>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </SectionCard>
 
-        {/* AI Governance */}
-        <SectionCard
-          title="AI Governance"
-          description="Models, prompts, and usage controls"
-          action={<Button size="sm" variant="outline"><Cpu className="mr-2 h-4 w-4" /> Configure</Button>}
-        >
-          <div className="space-y-3">
-            <div className="flex items-center justify-between text-sm">
-              <span>Default Model</span>
-              <Badge variant="secondary">Bynara AI</Badge>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span>Fallback Model</span>
-              <Badge variant="secondary">Ollama llama3.1</Badge>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span>Per-Politician Training</span>
-              <Badge variant="success"><CheckCircle2 className="mr-1 inline h-3 w-3" /> Active</Badge>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span>Monthly Quota</span>
-              <span className="font-medium">820K / 1M tokens</span>
-            </div>
-          </div>
-        </SectionCard>
-
-        {/* Quick Actions */}
-        <SectionCard title="Founder Actions">
+        <SectionCard title="God Mode Actions">
           <div className="flex flex-col gap-2">
-            <Button variant="outline" className="w-full justify-start" size="sm">
-              <Users className="mr-2 h-4 w-4" /> Manage Staff
-            </Button>
-            <Button variant="outline" className="w-full justify-start" size="sm">
-              <Lock className="mr-2 h-4 w-4" /> Roles & Permissions
-            </Button>
-            <Button variant="outline" className="w-full justify-start" size="sm">
-              <Wallet className="mr-2 h-4 w-4" /> Billing & Wallet
-            </Button>
-            <Button variant="outline" className="w-full justify-start" size="sm">
-              <Download className="mr-2 h-4 w-4" /> Bulk Data Export
-            </Button>
-            <Button variant="outline" className="w-full justify-start" size="sm">
-              <Activity className="mr-2 h-4 w-4" /> Audit Logs
-            </Button>
+            <Button variant="outline" className="w-full justify-start" size="sm"><Building2 className="mr-2 h-4 w-4" /> Deploy New Party</Button>
+            <Button variant="outline" className="w-full justify-start" size="sm"><Shield className="mr-2 h-4 w-4" /> Deploy Politician</Button>
+            <Button variant="outline" className="w-full justify-start" size="sm"><Users className="mr-2 h-4 w-4" /> Bulk Create Staff</Button>
+            <Button variant="outline" className="w-full justify-start" size="sm"><ToggleRight className="mr-2 h-4 w-4" /> Feature Permissions</Button>
+            <Button variant="outline" className="w-full justify-start" size="sm"><Key className="mr-2 h-4 w-4" /> API Keys</Button>
+            <Button variant="outline" className="w-full justify-start" size="sm"><Download className="mr-2 h-4 w-4" /> Bulk Data Export</Button>
+            <Button variant="outline" className="w-full justify-start" size="sm"><Activity className="mr-2 h-4 w-4" /> Audit Logs</Button>
           </div>
-        </SectionCard>
-
-        {/* System Status */}
-        <SectionCard title="Platform Health" action={<Badge variant="success">Healthy</Badge>}>
-          <EmptyState
-            icon={CheckCircle2}
-            title="All systems operational"
-            description="No critical alerts at this time."
-          />
         </SectionCard>
       </div>
     </DashboardLayout>
