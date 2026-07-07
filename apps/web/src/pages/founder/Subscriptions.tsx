@@ -21,7 +21,7 @@ export default function Subscriptions() {
 
   useEffect(() => {
     setLoading(true)
-    apiGet('/api/parties').then((r) => r.json()).then((d) => setParties(d.data || d || [])).finally(() => setLoading(false))
+    api.list('parties').then((r) => r.json()).then((d) => setParties(list || [])).finally(() => setLoading(false))
   }, [])
 
   function openEdit(p: any) {
@@ -42,11 +42,11 @@ export default function Subscriptions() {
     if (!editing) return
     setSaving(true)
     try {
-      await apiPut(`/api/parties/${editing.id}`, { ...editing, ...form })
+      await api.update('parties', editing.id, { ...editing, ...form })
       setDialogOpen(false)
-      const r = await apiGet('/api/parties')
-      const d = await r.json()
-      setParties(d.data || d || [])
+      const r = await api.list('parties')
+      
+      setParties(list || [])
     } catch (e) {
       console.error('[subscriptions] save error:', e)
       alert('Save failed.')

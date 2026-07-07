@@ -57,10 +57,10 @@ export function FounderDashboard() {
     setLoading(true)
     try {
       const [pRes, uRes, polRes, iRes, fRes, hRes] = await Promise.all([
-        api.get('/api/parties'),
-        api.get('/api/founder/users'),
-        api.get('/api/politicians'),
-        api.get('/api/integrations'),
+        api.list('parties'),
+        api.list('founder/users'),
+        api.list('politicians'),
+        api.list('integrations'),
         api.get('/api/features/matrix'),
         api.get('/api/founder/reports/political-health'),
       ])

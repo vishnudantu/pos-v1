@@ -85,9 +85,9 @@ export default function FounderUsers() {
     setSaving(true)
     try {
       if (editing) {
-        await apiPut(`/api/founder/users/${editing.id}`, form)
+        await api.update('founder/users', editing.id, form)
       } else {
-        await apiPost('/api/founder/users', { ...form, password: 'TempPass123!' })
+        await api.create('founder/users', { ...form, password: 'TempPass123!' })
       }
       setDialogOpen(false)
       await fetchData()
@@ -101,7 +101,7 @@ export default function FounderUsers() {
 
   async function toggleActive(u: User) {
     try {
-      await apiPut(`/api/founder/users/${u.id}`, { ...u, is_active: u.is_active ? 0 : 1 })
+      await api.update('founder/users', u.id, { ...u, is_active: u.is_active ? 0 : 1 })
       await fetchData()
     } catch (e) {
       console.error('[users] toggle error:', e)
@@ -112,7 +112,7 @@ export default function FounderUsers() {
   async function handleDelete(id: number) {
     if (!confirm('Deactivate this user?')) return
     try {
-      await apiDelete(`/api/founder/users/${id}`)
+      await api.remove('founder/users', id)
       await fetchData()
     } catch (e) {
       console.error('[users] delete error:', e)

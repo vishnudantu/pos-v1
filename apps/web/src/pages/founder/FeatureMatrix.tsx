@@ -38,8 +38,8 @@ export default function FeatureMatrix() {
   async function fetchBase() {
     const [f, p, pol] = await Promise.all([
       api.get('/api/features/matrix'),
-      api.get('/api/parties'),
-      api.get('/api/politicians'),
+      api.list('parties'),
+      api.list('politicians'),
     ])
     setGlobalFeatures(f.global || [])
     setParties(p.data || p || [])

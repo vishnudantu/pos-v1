@@ -74,7 +74,7 @@ export default function CrudPage({
     try {
       const r = await apiGet(endpoint)
       const data = await r.json()
-      setItems(data.data || data || [])
+      setItems(data || [])
     } catch (e) {
       console.error('[crud] fetch error:', e)
       setItems([])
@@ -124,9 +124,9 @@ export default function CrudPage({
     setSaving(true)
     try {
       if (editing) {
-        await apiPut(`${endpoint}/${editing[idKey]}`, payload)
+        await api.update(endpoint.replace('/api/', '').replace(/^\//, ''), editing[idKey], payload)
       } else {
-        await apiPost(endpoint, payload)
+        await api.create(endpoint.replace('/api/', '').replace(/^\//, ''), payload)
       }
       setDialogOpen(false)
       await fetchItems()
@@ -141,7 +141,7 @@ export default function CrudPage({
   async function handleDelete() {
     if (!deletingId) return
     try {
-      await apiDelete(`${endpoint}/${deletingId}`)
+      await api.remove(endpoint.replace('/api/', '').replace(/^\//, ''), deletingId)
       setDeleteOpen(false)
       await fetchItems()
     } catch (e) {

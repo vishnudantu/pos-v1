@@ -9,12 +9,12 @@ export default function Integrations() {
   const [parties, setParties] = useState<any[]>([])
 
   useEffect(() => {
-    apiGet('/api/integration-types')
+    api.list('integration-types')
       .then((r) => r.json())
       .then((d) => setIntegrationTypes(d.data || d || []))
       .catch(() => setIntegrationTypes([]))
 
-    apiGet('/api/parties')
+    api.list('parties')
       .then((r) => r.json())
       .then((d) => setParties(d.data || d || []))
       .catch(() => setParties([]))
@@ -59,7 +59,7 @@ export default function Integrations() {
     <CrudPage
       title="Integrations"
       subtitle="Connect AI, SMS, payments, WhatsApp, and other services per party."
-      endpoint="/api/integrations"
+      endpoint="integrations"
       fields={fields}
       badge="Platform"
       extraRowActions={(item, refresh) => (
@@ -68,7 +68,7 @@ export default function Integrations() {
           size="sm"
           onClick={async () => {
             try {
-              await apiPost(`/api/integrations/${item.id}/test`)
+              await api.post(`/api/integrations/${item.id}/test`)
               await refresh()
             } catch (e) {
               console.error(e)

@@ -15,7 +15,7 @@ export default function Constituencies() {
     <CrudPage
       title="Constituencies"
       subtitle="Manage assembly and parliamentary constituencies."
-      endpoint="/api/constituencies"
+      endpoint="constituencies"
       fields={fields}
       badge="Tenants"
     />
