@@ -1411,32 +1411,6 @@ app.post('/api/integrations/:id/test', authMiddleware, async (req, res) => {
   }
 });
 
-// Founder reports endpoint
-app.get('/api/founder/reports/political-health', authMiddleware, async (req, res) => {
-  if (req.user.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' });
-  try {
-    const [[partyCount]] = await pool.query('SELECT COUNT(*) as total FROM parties WHERE is_active = 1');
-    const [[politicianCount]] = await pool.query('SELECT COUNT(*) as total FROM politician_profiles WHERE is_active = 1');
-    const [[criticalCount]] = await pool.query(`
-      SELECT COUNT(*) as total FROM politician_profiles
-      WHERE is_active = 1 AND (
-        (SELECT COUNT(*) FROM grievances WHERE politician_id = politician_profiles.id AND status != 'resolved') > 5
-        OR (SELECT COUNT(*) FROM media_mentions WHERE politician_id = politician_profiles.id AND sentiment < -0.3) > 3
-      )
-    `);
-
-    res.json({
-      parties: partyCount.total,
-      politicians: politicianCount.total,
-      critical: criticalCount.total,
-      generated_at: new Date()
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-
 
 // Politician full edit + soft delete
 app.put('/api/politicians/:id', authMiddleware, async (req, res) => {
@@ -1732,92 +1706,93 @@ app.get('/api/founder/exports/:type', authMiddleware, async (req, res) => {
 
 
 
-// Real-time Political Health & Intelligence report
+// Real-time Political Health & Intelligence report (Founder view)
 app.get('/api/founder/reports/political-health', authMiddleware, async (req, res) => {
   if (req.user.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' });
   try {
     const [[partyCount]] = await pool.query('SELECT COUNT(*) as total FROM parties WHERE is_active = 1');
     const [[politicianCount]] = await pool.query('SELECT COUNT(*) as total FROM politician_profiles WHERE is_active = 1');
+    const [[inactivePoliticianCount]] = await pool.query('SELECT COUNT(*) as total FROM politician_profiles WHERE is_active = 0');
+    const [[userCount]] = await pool.query('SELECT COUNT(*) as total FROM users WHERE is_active = 1');
+    const [[integrationCount]] = await pool.query("SELECT COUNT(*) as total FROM party_integrations WHERE status = 'connected'");
+
+    const [activeSubscriptions] = await pool.query(`
+      SELECT subscription_plan, COUNT(*) as count
+      FROM parties
+      WHERE is_active = 1
+      GROUP BY subscription_plan
+    `);
 
     const [politicians] = await pool.query(
-      `SELECT id, full_name, display_name, party_id, party, constituency_name, state, color_primary
-       FROM politician_profiles WHERE is_active = 1 ORDER BY full_name`
+      `SELECT pp.id, pp.full_name, pp.display_name, pp.party, pp.constituency_name, pp.state,
+              pp.is_active, pp.subscription_status, pp.created_at, pp.updated_at,
+              p.name as party_name, p.subscription_plan, p.subscription_status as party_subscription_status,
+              p.subscription_expires
+       FROM politician_profiles pp
+       LEFT JOIN parties p ON pp.party_id = p.id
+       ORDER BY pp.full_name`
     );
 
-    const [grievances] = await pool.query('SELECT politician_id, status, priority, created_at, due_date FROM grievances');
-    const [media] = await pool.query('SELECT politician_id, sentiment, created_at FROM media_mentions');
-    const [events] = await pool.query(`SELECT politician_id, event_date FROM events WHERE event_date >= CURDATE()`);
-    const [booths] = await pool.query('SELECT politician_id, id FROM booths');
-
     const now = new Date();
-    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
     const politicianHealth = politicians.map((p) => {
-      const polGrievances = grievances.filter((g) => g.politician_id === p.id);
-      const totalGrievances = polGrievances.length;
-      const resolved = polGrievances.filter((g) => g.status === 'resolved').length;
-      const overdue = polGrievances.filter(
-        (g) => g.status !== 'resolved' && g.status !== 'rejected' && g.due_date && new Date(g.due_date) < now
-      ).length;
-      const grievanceResolution = totalGrievances ? Math.round((resolved / totalGrievances) * 100) : 0;
+      const plan = p.subscription_plan || 'none';
+      const status = p.subscription_status || 'none';
 
-      const polMedia = media.filter((m) => m.politician_id === p.id);
-      const mediaMentions24h = polMedia.filter((m) => new Date(m.created_at) >= oneDayAgo).length;
-      const avgSentiment = polMedia.length
-        ? polMedia.reduce((a, m) => a + (parseFloat(m.sentiment) || 0), 0) / polMedia.length
-        : 0;
-      const sentiment = Math.max(0, Math.min(100, Math.round(((avgSentiment + 1) / 2) * 100)));
+      let healthScore = 75;
+      if (!p.is_active) healthScore -= 40;
+      if (p.party_subscription_status === 'expired' || p.party_subscription_status === 'cancelled') healthScore -= 30;
+      if (p.party_subscription_status === 'paused') healthScore -= 15;
+      if (status === 'trial') healthScore -= 10;
+      if (!p.party_name) healthScore -= 20;
 
-      const upcomingEvents = events.filter((e) => e.politician_id === p.id).length;
-      const boothCount = booths.filter((b) => b.politician_id === p.id).length;
-      const boothStrength = Math.min(100, Math.max(30, 60 + boothCount * 2 - overdue * 3));
+      const daysSinceUpdate = p.updated_at
+        ? Math.max(1, Math.round((now.getTime() - new Date(p.updated_at).getTime()) / (1000 * 60 * 60 * 24)))
+        : 30;
 
-      const negativeMedia = polMedia.filter((m) => (parseFloat(m.sentiment) || 0) < -0.3).length;
-      const redFlags = overdue + negativeMedia + (grievanceResolution < 50 ? 1 : 0);
+      healthScore = Math.max(0, Math.min(100, healthScore));
 
-      const winningIndex = Math.min(
-        100,
-        Math.round(
-          grievanceResolution * 0.35 +
-          sentiment * 0.25 +
-          boothStrength * 0.25 +
-          Math.max(0, 100 - redFlags * 10) * 0.15
-        )
-      );
+      let state = 'strong';
+      if (healthScore < 40) state = 'critical';
+      else if (healthScore < 60) state = 'at-risk';
+      else if (healthScore < 75) state = 'competitive';
 
-      let status = 'strong';
-      if (winningIndex < 45) status = 'critical';
-      else if (winningIndex < 60) status = 'at-risk';
-      else if (winningIndex < 75) status = 'competitive';
-
-      let trend = 'flat';
-      if (sentiment > 60 && grievanceResolution > 60) trend = 'up';
-      else if (sentiment < 40 || grievanceResolution < 40) trend = 'down';
+      const daysToExpiry = p.subscription_expires
+        ? Math.max(0, Math.round((new Date(p.subscription_expires).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
+        : null;
 
       return {
         id: p.id,
         name: p.display_name || p.full_name,
         constituency: p.constituency_name,
         state: p.state,
-        party: p.party,
-        party_color: p.color_primary,
-        winningIndex,
-        sentiment,
-        grievanceResolution,
-        boothStrength,
-        mediaMentions24h,
-        redFlags,
-        upcomingEvents,
+        party: p.party_name || p.party || 'Independent',
+        party_color: p.color_primary || '#3b82f6',
+        healthScore,
+        isActive: !!p.is_active,
+        plan,
         status,
-        trend,
+        partySubscriptionStatus: p.party_subscription_status,
+        daysSinceUpdate,
+        daysToExpiry,
+        state,
       };
     });
+
+    const planCounts = activeSubscriptions.reduce((acc, row) => {
+      acc[row.subscription_plan || 'none'] = row.count;
+      return acc;
+    }, {});
 
     res.json({
       summary: {
         parties: partyCount.total,
         politicians: politicianCount.total,
-        critical: politicianHealth.filter((p) => p.status === 'critical' || p.status === 'at-risk').length,
+        inactive: inactivePoliticianCount.total,
+        activeUsers: userCount.total,
+        connectedIntegrations: integrationCount.total,
+        critical: politicianHealth.filter((p) => p.state === 'critical' || p.state === 'at-risk').length,
+        planCounts,
         generated_at: new Date(),
       },
       politicians: politicianHealth,
@@ -1827,6 +1802,8 @@ app.get('/api/founder/reports/political-health', authMiddleware, async (req, res
     res.status(500).json({ error: err.message });
   }
 });
+
+
 
 
 // ── END FOUNDER API ───────────────────────────────────────────

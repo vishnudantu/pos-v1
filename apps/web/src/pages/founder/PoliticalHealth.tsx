@@ -1,21 +1,20 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   TrendingUp,
-  AlertOctagon,
-  MessageSquareWarning,
-  Newspaper,
   Users,
-  MapPin,
+  Building2,
+  AlertTriangle,
+  Shield,
+  CreditCard,
   Download,
   RefreshCw,
-  Filter,
   ArrowUpRight,
   ArrowDownRight,
   Minus,
-  Flag,
   Activity,
   Bell,
   FileText,
+  Calendar,
 } from 'lucide-react'
 import { Card, CardContent } from '../../components/primitives/Card'
 import { Button } from '../../components/primitives/Button'
@@ -24,23 +23,6 @@ import { SectionCard } from '../../components/primitives/SectionCard'
 import { StatCard } from '../../components/primitives/StatCard'
 import { Loading } from '../../components/primitives/Loading'
 import { api } from '../../lib/api'
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  Cell,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar,
-} from 'recharts'
 
 interface PoliticianHealth {
   id: number
@@ -49,34 +31,15 @@ interface PoliticianHealth {
   state?: string
   party?: string
   party_color?: string | null
-  winningIndex: number
-  sentiment: number
-  grievanceResolution: number
-  boothStrength: number
-  mediaMentions24h: number
-  redFlags: number
-  upcomingEvents: number
-  trend: 'up' | 'down' | 'flat'
-  status: 'strong' | 'competitive' | 'at-risk' | 'critical'
-  lastAlert?: string
+  healthScore: number
+  isActive: boolean
+  plan: string
+  status: string
+  partySubscriptionStatus?: string
+  daysSinceUpdate: number
+  daysToExpiry: number | null
+  state: 'strong' | 'competitive' | 'at-risk' | 'critical'
 }
-
-const SENTIMENT_DATA = [
-  { day: 'Mon', positive: 65, negative: 25, neutral: 10 },
-  { day: 'Tue', positive: 68, negative: 22, neutral: 10 },
-  { day: 'Wed', positive: 62, negative: 28, neutral: 10 },
-  { day: 'Thu', positive: 70, negative: 20, neutral: 10 },
-  { day: 'Fri', positive: 74, negative: 18, neutral: 8 },
-  { day: 'Sat', positive: 71, negative: 21, neutral: 8 },
-  { day: 'Sun', positive: 69, negative: 23, neutral: 8 },
-]
-
-const BOOTH_DATA = [
-  { name: 'Strong', value: 142 },
-  { name: 'Good', value: 98 },
-  { name: 'Weak', value: 64 },
-  { name: 'Critical', value: 31 },
-]
 
 function StatusBadge({ status }: { status: string }) {
   const variants: Record<string, 'success' | 'warning' | 'danger' | 'secondary'> = {
@@ -88,9 +51,9 @@ function StatusBadge({ status }: { status: string }) {
   return <Badge variant={variants[status] || 'secondary'}>{status.replace('-', ' ').toUpperCase()}</Badge>
 }
 
-function TrendIcon({ trend }: { trend: string }) {
-  if (trend === 'up') return <ArrowUpRight className="h-4 w-4 text-success" />
-  if (trend === 'down') return <ArrowDownRight className="h-4 w-4 text-danger" />
+function TrendIcon({ daysSinceUpdate }: { daysSinceUpdate: number }) {
+  if (daysSinceUpdate < 7) return <ArrowUpRight className="h-4 w-4 text-success" />
+  if (daysSinceUpdate > 30) return <ArrowDownRight className="h-4 w-4 text-danger" />
   return <Minus className="h-4 w-4 text-muted-foreground" />
 }
 
@@ -105,10 +68,13 @@ export default function PoliticalHealth() {
     setLoading(true)
     try {
       const data = await api.get('/api/founder/reports/political-health')
-      setPoliticians(data.politicians || [])
-      setSummary(data.summary || null)
+      const list = Array.isArray(data?.politicians) ? data.politicians : []
+      setPoliticians(list)
+      setSummary(data?.summary || { parties: 0, politicians: list.length, critical: 0 })
     } catch (e) {
       console.error('[political-health] fetch error:', e)
+      setPoliticians([])
+      setSummary({ parties: 0, politicians: 0, critical: 0 })
     } finally {
       setLoading(false)
     }
@@ -120,17 +86,16 @@ export default function PoliticalHealth() {
 
   const filteredData = useMemo(() => {
     if (filter === 'all') return politicians
-    return politicians.filter((p) => p.status === filter)
+    return politicians.filter((p) => p.state === filter)
   }, [politicians, filter])
 
   const averages = useMemo(() => {
     const n = politicians.length || 1
     return {
-      winningIndex: Math.round(politicians.reduce((a, b) => a + b.winningIndex, 0) / n),
-      sentiment: Math.round(politicians.reduce((a, b) => a + b.sentiment, 0) / n),
-      boothStrength: Math.round(politicians.reduce((a, b) => a + b.boothStrength, 0) / n),
-      redFlags: politicians.reduce((a, b) => a + b.redFlags, 0),
-      critical: politicians.filter((p) => p.status === 'critical' || p.status === 'at-risk').length,
+      healthScore: Math.round(politicians.reduce((a, b) => a + (b.healthScore || 0), 0) / n),
+      activePct: Math.round((politicians.filter((p) => p.isActive).length / n) * 100),
+      avgDaysSinceUpdate: Math.round(politicians.reduce((a, b) => a + (b.daysSinceUpdate || 0), 0) / n),
+      critical: politicians.filter((p) => p.state === 'critical' || p.state === 'at-risk').length,
     }
   }, [politicians])
 
@@ -142,11 +107,13 @@ export default function PoliticalHealth() {
     }, 1500)
   }
 
-  function severityAlert(p: PoliticianHealth): string | undefined {
-    if (p.redFlags >= 5) return 'Multiple red flags detected'
-    if (p.grievanceResolution < 50) return 'Grievance resolution rate falling'
-    if (p.sentiment < 40) return 'Negative sentiment trend'
-    if (p.boothStrength < 55) return 'Weak booth coverage'
+  function alertText(p: PoliticianHealth): string | undefined {
+    if (!p.isActive) return 'Politician account is inactive'
+    if (p.partySubscriptionStatus === 'expired') return 'Party subscription expired'
+    if (p.partySubscriptionStatus === 'cancelled') return 'Party subscription cancelled'
+    if (p.partySubscriptionStatus === 'paused') return 'Party subscription paused'
+    if (p.daysToExpiry !== null && p.daysToExpiry < 30) return `Subscription expires in ${p.daysToExpiry} days`
+    if (p.daysSinceUpdate > 60) return 'No profile updates in 60+ days'
     return undefined
   }
 
@@ -161,7 +128,7 @@ export default function PoliticalHealth() {
             <Badge variant="info">Super Admin</Badge>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            Winning index, sentiment, red flags, and operational health across all active politicians.
+            Tenant health, subscription status, and platform engagement across all politicians.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -172,16 +139,16 @@ export default function PoliticalHealth() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Politicians" value={summary?.politicians ?? 0} icon={Users} delta={summary?.parties} deltaLabel="parties" />
-        <StatCard label="Avg Winning Index" value={averages.winningIndex} icon={TrendingUp} delta={5} deltaLabel="vs last week" />
-        <StatCard label="Avg Booth Strength" value={`${averages.boothStrength}%`} icon={MapPin} delta={3} deltaLabel="vs target" />
-        <StatCard label="Red Flags" value={averages.redFlags} icon={AlertOctagon} delta={averages.critical} deltaLabel="critical" />
+        <StatCard label="Avg Health Score" value={averages.healthScore} icon={TrendingUp} delta={averages.activePct} deltaLabel="% active" />
+        <StatCard label="Critical" value={averages.critical} icon={AlertTriangle} delta={summary?.inactive} deltaLabel="inactive" />
+        <StatCard label="Integrations" value={summary?.connectedIntegrations ?? 0} icon={Activity} deltaLabel="connected" />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <SectionCard
           className="lg:col-span-2"
           title="Politician Health Matrix"
-          description="Ranked by composite winning index"
+          description="Ranked by tenant health score"
           action={
             <select
               value={filter}
@@ -211,14 +178,15 @@ export default function PoliticalHealth() {
                       <div>
                         <div className="flex items-center gap-2">
                           <p className="font-medium">{p.name}</p>
-                          <StatusBadge status={p.status} />
-                          <TrendIcon trend={p.trend} />
+                          <StatusBadge status={p.state} />
+                          <TrendIcon daysSinceUpdate={p.daysSinceUpdate} />
+                          {!p.isActive && <Badge variant="secondary">Inactive</Badge>}
                         </div>
                         <p className="text-xs text-muted-foreground">
                           {p.constituency}{p.constituency && p.state ? ', ' : ''}{p.state}{p.party ? ` · ${p.party}` : ''}
                         </p>
                         {(() => {
-                          const alert = severityAlert(p)
+                          const alert = alertText(p)
                           return alert ? (
                             <div className="mt-1 flex items-center gap-1 text-xs text-warning">
                               <Bell className="h-3 w-3" />{alert}
@@ -229,20 +197,22 @@ export default function PoliticalHealth() {
                     </div>
                     <div className="grid grid-cols-4 gap-2 md:gap-4">
                       <div className="text-center">
-                        <p className="text-xs text-muted-foreground">Win</p>
-                        <p className={`font-semibold ${p.winningIndex >= 70 ? 'text-success' : p.winningIndex >= 50 ? 'text-warning' : 'text-danger'}`}>{p.winningIndex}</p>
+                        <p className="text-xs text-muted-foreground">Health</p>
+                        <p className={`font-semibold ${p.healthScore >= 70 ? 'text-success' : p.healthScore >= 50 ? 'text-warning' : 'text-danger'}`}>{p.healthScore}</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-xs text-muted-foreground">Sent.</p>
-                        <p className="font-semibold">{p.sentiment}%</p>
+                        <p className="text-xs text-muted-foreground">Plan</p>
+                        <p className="text-xs font-medium uppercase">{p.plan}</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-xs text-muted-foreground">Booth</p>
-                        <p className="font-semibold">{p.boothStrength}%</p>
+                        <p className="text-xs text-muted-foreground">Updated</p>
+                        <p className="font-semibold">{p.daysSinceUpdate}d</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-xs text-muted-foreground">Flags</p>
-                        <p className={`font-semibold ${p.redFlags > 3 ? 'text-danger' : 'text-foreground'}`}>{p.redFlags}</p>
+                        <p className="text-xs text-muted-foreground">Expiry</p>
+                        <p className={`font-semibold ${p.daysToExpiry !== null && p.daysToExpiry < 30 ? 'text-danger' : ''}`}>
+                          {p.daysToExpiry !== null ? `${p.daysToExpiry}d` : '—'}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -253,102 +223,45 @@ export default function PoliticalHealth() {
         </SectionCard>
 
         <div className="space-y-6">
-          <SectionCard title="Red Flag Alerts" description="Issues requiring founder attention" action={<Badge variant="danger">{filteredData.filter((p) => p.redFlags > 0).length} open</Badge>}>
+          <SectionCard title="Subscription Mix" description="Active party plans">
+            <div className="space-y-2">
+              {Object.entries(summary?.planCounts || {}).map(([plan, count]: [string, any]) => (
+                <div key={plan} className="flex items-center justify-between rounded-md border p-3">
+                  <span className="text-sm font-medium capitalize">{plan}</span>
+                  <Badge variant="outline">{count}</Badge>
+                </div>
+              ))}
+              {Object.keys(summary?.planCounts || {}).length === 0 && (
+                <p className="text-sm text-muted-foreground">No active subscriptions yet.</p>
+              )}
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Alerts" description="Tenant issues">
             <div className="space-y-2">
               {filteredData
-                .filter((p) => p.redFlags > 0)
+                .filter((p) => alertText(p))
                 .slice(0, 6)
                 .map((p) => (
                   <div key={p.id} className="rounded-md border p-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs text-muted-foreground">{p.name}</p>
-                      <Badge variant={p.redFlags > 4 ? 'danger' : 'warning'}>{p.redFlags} flags</Badge>
-                    </div>
-                    <p className="mt-1 text-sm font-medium">{severityAlert(p) || 'Attention needed'}</p>
+                    <p className="text-xs text-muted-foreground">{p.name}</p>
+                    <p className="text-sm font-medium">{alertText(p)}</p>
                   </div>
                 ))}
+              {filteredData.filter((p) => alertText(p)).length === 0 && (
+                <p className="text-sm text-muted-foreground">No active alerts.</p>
+              )}
             </div>
           </SectionCard>
 
-          <SectionCard title="Sentiment Trend (7d)">
-            <div className="h-48">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={SENTIMENT_DATA}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                  <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }} />
-                  <Line type="monotone" dataKey="positive" stroke="hsl(var(--success))" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="negative" stroke="hsl(var(--danger))" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
+          <SectionCard title="Platform Pulse">
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between"><span>Active Users</span><span className="font-medium">{summary?.activeUsers ?? 0}</span></div>
+              <div className="flex justify-between"><span>Connected Integrations</span><span className="font-medium">{summary?.connectedIntegrations ?? 0}</span></div>
+              <div className="flex justify-between"><span>Inactive Politicians</span><span className="font-medium">{summary?.inactive ?? 0}</span></div>
             </div>
           </SectionCard>
         </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <SectionCard title="Booth Strength Distribution">
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={BOOTH_DATA}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }} />
-                <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                  {BOOTH_DATA.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={['hsl(var(--success))', 'hsl(142 71% 55%)', 'hsl(var(--warning))', 'hsl(var(--danger))'][index]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </SectionCard>
-
-        <SectionCard title="Composite Strength Radar">
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <RadarChart cx="50%" cy="50%" outerRadius="80%" data={[
-                { metric: 'Sentiment', A: averages.sentiment, fullMark: 100 },
-                { metric: 'Booth Strength', A: averages.boothStrength, fullMark: 100 },
-                { metric: 'Grievance Resolution', A: Math.round(politicians.reduce((a,b)=>a+b.grievanceResolution,0)/(politicians.length||1)), fullMark: 100 },
-                { metric: 'Media Presence', A: Math.min(100, Math.round(politicians.reduce((a,b)=>a+b.mediaMentions24h,0)/(politicians.length||1)*10)), fullMark: 100 },
-                { metric: 'Winning Index', A: averages.winningIndex, fullMark: 100 },
-              ]}>
-                <PolarGrid stroke="hsl(var(--border))" />
-                <PolarAngleAxis dataKey="metric" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} />
-                <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }} />
-                <Radar name="Org Average" dataKey="A" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.25} />
-                <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }} />
-              </RadarChart>
-            </ResponsiveContainer>
-          </div>
-        </SectionCard>
-
-        <SectionCard title="Recent Intelligence" description="Auto-generated insights">
-          <div className="space-y-3">
-            <div className="flex items-start gap-2 text-sm">
-              <Activity className="mt-0.5 h-4 w-4 text-info" />
-              <p>{politicians.filter((p) => p.trend === 'down').length} politicians show declining health.</p>
-            </div>
-            <div className="flex items-start gap-2 text-sm">
-              <Flag className="mt-0.5 h-4 w-4 text-warning" />
-              <p>Booth strength below 60% in {politicians.filter((p) => p.boothStrength < 60).length} politician records.</p>
-            </div>
-            <div className="flex items-start gap-2 text-sm">
-              <MessageSquareWarning className="mt-0.5 h-4 w-4 text-danger" />
-              <p>{averages.redFlags} active red flags across the platform.</p>
-            </div>
-            <div className="flex items-start gap-2 text-sm">
-              <Newspaper className="mt-0.5 h-4 w-4 text-success" />
-              <p>{politicians.filter((p) => p.sentiment > 60).length} politicians have positive sentiment.</p>
-            </div>
-          </div>
-          <Button className="mt-4 w-full" size="sm" variant="outline">
-            <FileText className="mr-2 h-4 w-4" /> View Full Intelligence Brief
-          </Button>
-        </SectionCard>
       </div>
     </div>
   )
