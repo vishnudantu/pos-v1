@@ -55,6 +55,7 @@ import ElectionCommandCenter from './pages/ElectionCommandCenter';
 import FinancialCompliance from './pages/FinancialCompliance';
 import PartyIntegration from './pages/PartyIntegration';
 import DigitalTwin from './pages/DigitalTwin';
+import PoliticalHealth from './pages/founder/PoliticalHealth';
 
 function AppContent() {
   const { user, loading } = useAuth() as any;
