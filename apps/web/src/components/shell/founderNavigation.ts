@@ -13,13 +13,6 @@ import {
   Activity,
   Landmark,
   TrendingUp,
-  MessageSquareWarning,
-  CalendarDays,
-  Vote,
-  Map,
-  BrainCircuit,
-  Newspaper,
-  Smartphone,
 } from 'lucide-react'
 import { NavGroup } from './types'
 
@@ -31,33 +24,6 @@ export function getFounderNavigation(): NavGroup[] {
         { label: 'Founder Dashboard', to: '/dashboard', icon: LayoutDashboard },
         { label: 'Political Health', to: '/founder/political-health', icon: TrendingUp },
         { label: 'Public Website', to: '/founder/public', icon: Globe },
-      ],
-    },
-    {
-      label: 'Operations',
-      items: [
-        { label: 'Grievances', to: '/grievances', icon: MessageSquareWarning },
-        { label: 'Events', to: '/events', icon: CalendarDays },
-        { label: 'Appointments', to: '/appointments', icon: CalendarDays },
-        { label: 'Voters', to: '/voters', icon: Users },
-        { label: 'Booths', to: '/booths', icon: Map },
-        { label: 'Darshan', to: '/darshan', icon: Landmark },
-      ],
-    },
-    {
-      label: 'Intelligence',
-      items: [
-        { label: 'Morning Brief', to: '/morning-brief', icon: Activity },
-        { label: 'AI Studio', to: '/ai-studio', icon: BrainCircuit },
-        { label: 'OmniScan Media', to: '/media', icon: Newspaper },
-        { label: 'Sentiment', to: '/sentiment', icon: TrendingUp },
-      ],
-    },
-    {
-      label: 'Ground',
-      items: [
-        { label: 'WhatsApp Intel', to: '/whatsapp-intelligence', icon: Smartphone },
-        { label: 'Quick Capture', to: '/quick-capture', icon: Activity },
       ],
     },
     {
