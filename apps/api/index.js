@@ -1503,6 +1503,77 @@ app.delete('/api/politicians/:id', authMiddleware, async (req, res) => {
 });
 
 
+
+
+// Founder user management
+app.get('/api/founder/users', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const [rows] = await pool.query(
+      'SELECT id, email, display_name, role, politician_id, is_active, last_login_at, created_at FROM users ORDER BY created_at DESC'
+    );
+    res.json({ data: rows });
+  } catch (err) {
+    console.error('[founder/users] list error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/founder/users', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const { email, password, display_name, role, politician_id, is_active } = req.body;
+    if (!email || !password || !role) return res.status(400).json({ error: 'Email, password and role required' });
+
+    const bcrypt = require('bcryptjs');
+    const hash = bcrypt.hashSync(password, 10);
+
+    const [result] = await pool.query(
+      `INSERT INTO users (email, password_hash, display_name, role, politician_id, is_active)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [email, hash, display_name || null, role, politician_id || null, is_active ? 1 : 0]
+    );
+    res.status(201).json({ id: result.insertId, email, display_name, role, politician_id, is_active });
+  } catch (err) {
+    console.error('[founder/users] create error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/founder/users/:id', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const data = req.body;
+    const fields = [];
+    const values = [];
+    ['email', 'display_name', 'role', 'politician_id', 'is_active'].forEach((k) => {
+      if (data[k] !== undefined) {
+        fields.push(`${k} = ?`);
+        values.push(k === 'is_active' ? (data[k] ? 1 : 0) : data[k]);
+      }
+    });
+    if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
+    values.push(req.params.id);
+    await pool.query(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`, values);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[founder/users] update error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/founder/users/:id', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' });
+  try {
+    await pool.query('UPDATE users SET is_active = 0 WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[founder/users] delete error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 // ── END FOUNDER API ───────────────────────────────────────────
 
 // ── TEMPLE DARSHAN API ───────────────────────────────────────
