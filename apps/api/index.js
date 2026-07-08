@@ -1820,6 +1820,115 @@ app.delete('/api/voters/:id', authMiddleware, async (req, res) => {
 });
 
 
+
+
+// ── KARYAKARTA MOBILE COMMAND CENTER ──────────────────────────
+app.get('/api/dashboard/karyakarta', authMiddleware, async (req, res) => {
+  const user = req.user;
+  const role = user.role;
+  const isKaryakarta = role === 'karyakarta' || role === 'field_worker';
+  if (!isKaryakarta) return res.status(403).json({ error: 'Forbidden' });
+
+  try {
+    const politicianId = user.politician_id;
+
+    // Assigned booth
+    const [[booth]] = await pool.query(
+      'SELECT * FROM karyakarta_booths WHERE user_id = ? AND politician_id = ? AND is_active = 1',
+      [user.id, politicianId]
+    );
+
+    // Today's tasks
+    const [tasks] = await pool.query(
+      `SELECT * FROM karyakarta_tasks
+       WHERE (assigned_to_user_id = ? OR assigned_to_user_id IS NULL)
+         AND politician_id = ?
+         AND status IN ('pending','in_progress')
+         AND (due_date IS NULL OR due_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY))
+       ORDER BY FIELD(priority, 'urgent','high','medium','low'), due_date ASC LIMIT 20`,
+      [user.id, politicianId]
+    );
+
+    // Voter contact stats
+    let contactsToday = 0;
+    let totalContacts = 0;
+    try {
+      const [[todayRow]] = await pool.query(
+        `SELECT COUNT(*) as total FROM voter_contacts WHERE user_id = ? AND DATE(created_at) = CURDATE()`,
+        [user.id]
+      );
+      const [[totalRow]] = await pool.query(
+        `SELECT COUNT(*) as total FROM voter_contacts WHERE user_id = ?`,
+        [user.id]
+      );
+      contactsToday = todayRow.total || 0;
+      totalContacts = totalRow.total || 0;
+    } catch (e) {
+      // table may not exist yet
+    }
+
+    // Offline captures pending sync
+    let pendingSync = 0;
+    try {
+      const [[syncRow]] = await pool.query(
+        `SELECT COUNT(*) as total FROM quick_captures WHERE user_id = ? AND synced = 0`,
+        [user.id]
+      );
+      pendingSync = syncRow.total || 0;
+    } catch (e) {}
+
+    res.json({
+      user: { id: user.id, display_name: user.display_name, role: user.role },
+      booth,
+      tasks,
+      stats: {
+        contactsToday,
+        totalContacts,
+        pendingTasks: tasks.filter((t) => t.status === 'pending').length,
+        completedToday: tasks.filter((t) => t.status === 'completed').length,
+        pendingSync,
+      }
+    });
+  } catch (err) {
+    console.error('[karyakarta-dashboard] error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/karyakarta/tasks/:id/complete', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'karyakarta' && req.user.role !== 'field_worker') {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  try {
+    await pool.query(
+      `UPDATE karyakarta_tasks SET status = 'completed', completed_at = NOW() WHERE id = ? AND (assigned_to_user_id = ? OR assigned_to_user_id IS NULL)`,
+      [req.params.id, req.user.id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/karyakarta/leaderboard', authMiddleware, async (req, res) => {
+  try {
+    const politicianId = req.query.politician_id || req.user.politician_id;
+    const [rows] = await pool.query(
+      `SELECT u.id, u.display_name, COUNT(vc.id) as contacts
+       FROM users u
+       LEFT JOIN voter_contacts vc ON vc.user_id = u.id
+       WHERE u.role IN ('karyakarta','field_worker')
+       GROUP BY u.id
+       ORDER BY contacts DESC
+       LIMIT 10`
+    );
+    res.json({ data: rows });
+  } catch (err) {
+    res.json({ data: [] });
+  }
+});
+
+
 // ── END FOUNDER API ───────────────────────────────────────────
 
 // ── TEMPLE DARSHAN API ───────────────────────────────────────
