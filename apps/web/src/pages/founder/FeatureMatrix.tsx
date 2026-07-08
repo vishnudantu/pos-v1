@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ToggleRight, Building2, UserCheck, Shield, Globe } from 'lucide-react'
+import { ToggleRight, Building2, UserCheck, Shield, Globe, CheckCircle2, XCircle, Info } from 'lucide-react'
 import { api } from '../../lib/api'
 import { Button } from '../../components/primitives/Button'
 import { Card, CardContent } from '../../components/primitives/Card'
@@ -11,20 +11,38 @@ import { Select } from '../../components/primitives/Select'
 
 interface Feature {
   id: number
-  feature_key: string
-  feature_name?: string
-  module_name?: string
+  module_key: string
+  label: string
+  category: string
   description?: string
   is_active: number
 }
 
+interface AccessRecord {
+  feature_key: string
+  is_enabled: number
+}
+
 const ROLES = ['super_admin', 'founder', 'politician_admin', 'politician', 'staff', 'team', 'field_worker']
+
+function scopeName(scope: string, id: string, parties: any[], politicians: any[]) {
+  if (scope === 'global') return 'Global default'
+  if (scope === 'party') {
+    const p = parties.find((x) => String(x.id) === id)
+    return p?.name || 'Unknown party'
+  }
+  if (scope === 'politician') {
+    const p = politicians.find((x) => String(x.id) === id)
+    return p?.display_name || p?.full_name || 'Unknown politician'
+  }
+  return id.replace(/_/g, ' ').toUpperCase()
+}
 
 export default function FeatureMatrix() {
   const [globalFeatures, setGlobalFeatures] = useState<Feature[]>([])
   const [parties, setParties] = useState<any[]>([])
   const [politicians, setPoliticians] = useState<any[]>([])
-  const [access, setAccess] = useState<any[]>([])
+  const [access, setAccess] = useState<AccessRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [savingKey, setSavingKey] = useState<string | null>(null)
 
@@ -42,8 +60,8 @@ export default function FeatureMatrix() {
       api.list('politicians'),
     ])
     setGlobalFeatures(f.global || [])
-    setParties(p.data || p || [])
-    setPoliticians(pol.data || pol || [])
+    setParties(p || [])
+    setPoliticians(pol || [])
   }
 
   async function fetchAccess() {
@@ -58,7 +76,8 @@ export default function FeatureMatrix() {
 
     const qs = new URLSearchParams(params).toString()
     const data = await api.get(`/api/features/matrix${qs ? '?' + qs : ''}`)
-    const records = scope === 'party' ? (data.party_access || [])
+    const records =
+      scope === 'party' ? (data.party_access || [])
       : scope === 'politician' ? (data.politician_access || [])
       : (data.role_access || [])
     setAccess(records || [])
@@ -85,9 +104,9 @@ export default function FeatureMatrix() {
       })
       await fetchBase()
       await fetchAccess()
-    } catch (e) {
+    } catch (e: any) {
       console.error('[features] toggle error:', e)
-      alert('Toggle failed')
+      alert('Toggle failed: ' + e.message)
     } finally {
       setSavingKey(null)
     }
@@ -95,13 +114,18 @@ export default function FeatureMatrix() {
 
   function isEnabled(key: string): boolean {
     if (scope === 'global') {
-      const f = globalFeatures.find((x) => x.feature_key === key)
+      const f = globalFeatures.find((x) => x.module_key === key)
       return f ? !!f.is_active : false
     }
     const a = access.find((x) => x.feature_key === key)
     if (a) return !!a.is_enabled
-    const f = globalFeatures.find((x) => x.feature_key === key)
+    const f = globalFeatures.find((x) => x.module_key === key)
     return f ? !!f.is_active : false
+  }
+
+  function isExplicit(key: string): boolean {
+    if (scope === 'global') return true
+    return access.some((x) => x.feature_key === key)
   }
 
   const scopeOptions = useMemo(() => {
@@ -113,16 +137,27 @@ export default function FeatureMatrix() {
     }
   }, [scope, parties, politicians])
 
+  const grouped = useMemo(() => {
+    const map: Record<string, Feature[]> = {}
+    globalFeatures.forEach((f) => {
+      if (!map[f.category]) map[f.category] = []
+      map[f.category].push(f)
+    })
+    return map
+  }, [globalFeatures])
+
   return (
     <div className="mx-auto max-w-[1600px] space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Feature Matrix</h1>
-        <p className="text-sm text-muted-foreground">Enable or disable features globally, per party, per politician, or per role.</p>
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Feature Matrix</h1>
+          <p className="text-sm text-muted-foreground">Enable or disable features globally, per party, per politician, or per role.</p>
+        </div>
       </div>
 
       <Card>
         <CardContent className="p-4">
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2 rounded-md border p-1">
               {[
                 { key: 'global', label: 'Global', icon: Globe },
@@ -142,47 +177,71 @@ export default function FeatureMatrix() {
                 )
               })}
             </div>
+
             {scope !== 'global' && (
-              <div className="min-w-[220px]">
+              <div className="min-w-[260px]">
                 <Select value={scopeId} onChange={(e) => setScopeId(e.target.value)} options={scopeOptions} />
               </div>
             )}
+
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Info className="h-3.5 w-3.5" />
+              {scope === 'global' ? 'Controls platform default' : `Overrides global for ${scopeName(scope, scopeId, parties, politicians)}`}
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      <SectionCard title={`${scope.charAt(0).toUpperCase() + scope.slice(1)} Features`}>
-        {loading ? <Loading text="Loading features..." /> : globalFeatures.length === 0 ? (
-          <EmptyState icon={ToggleRight} title="No features found" description="Feature modules will appear once configured." />
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {globalFeatures.map((f) => {
-              const enabled = isEnabled(f.feature_key)
-              return (
-                <Card key={f.id} className={enabled ? 'border-primary/30' : ''}>
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-medium">{f.feature_name || f.module_name || f.feature_key}</p>
-                        <p className="text-xs text-muted-foreground">{f.description || 'No description'}</p>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant={enabled ? 'primary' : 'outline'}
-                        onClick={() => toggle(f.feature_key)}
-                        loading={savingKey === f.feature_key}
-                        disabled={scope !== 'global' && !scopeId}
-                      >
-                        {enabled ? 'Enabled' : 'Disabled'}
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </div>
-        )}
-      </SectionCard>
+      {scope !== 'global' && !scopeId ? (
+        <Card>
+          <CardContent className="p-8 text-center text-sm text-muted-foreground">
+            Select a {scope} above to manage its feature overrides.
+          </CardContent>
+        </Card>
+      ) : loading ? (
+        <Loading text="Loading features..." />
+      ) : globalFeatures.length === 0 ? (
+        <EmptyState icon={ToggleRight} title="No features found" description="Feature modules will appear once configured." />
+      ) : (
+        <div className="space-y-6">
+          {Object.entries(grouped).map(([category, items]) => (
+            <SectionCard key={category} title={category} description={`${items.length} feature${items.length === 1 ? '' : 's'}`}>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {items.map((f) => {
+                  const enabled = isEnabled(f.module_key)
+                  const explicit = isExplicit(f.module_key)
+                  return (
+                    <Card key={f.id} className={enabled ? 'border-primary/30' : ''}>
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium">{f.label}</p>
+                              {explicit && scope !== 'global' && (
+                                <Badge variant="outline" className="text-[10px]">Override</Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground">{f.description || 'No description'}</p>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant={enabled ? 'primary' : 'outline'}
+                            onClick={() => toggle(f.module_key)}
+                            loading={savingKey === f.module_key}
+                            disabled={scope !== 'global' && !scopeId}
+                          >
+                            {enabled ? 'Enabled' : 'Disabled'}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </div>
+            </SectionCard>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
