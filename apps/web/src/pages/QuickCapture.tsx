@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { Mic, Camera, Send, X, MapPin, User, FileText, AlertCircle, CheckCircle2 } from 'lucide-react'
-import { useAuth } from '../../lib/auth'
-import { api } from '../../lib/api'
-import { Button } from '../../components/primitives/Button'
-import { Card, CardContent } from '../../components/primitives/Card'
-import { Badge } from '../../components/primitives/Badge'
-import { SectionCard } from '../../components/primitives/SectionCard'
-import { Loading } from '../../components/primitives/Loading'
+import { useAuth } from '../lib/auth'
+import { api } from '../lib/api'
+import { Button } from '../components/primitives/Button'
+import { Card, CardContent } from '../components/primitives/Card'
+import { Badge } from '../components/primitives/Badge'
+import { SectionCard } from '../components/primitives/SectionCard'
+import { Loading } from '../components/primitives/Loading'
 
 const TYPES = [
   { key: 'grievance', label: 'Grievance', icon: AlertCircle, color: 'danger' },
