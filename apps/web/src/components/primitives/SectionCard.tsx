@@ -1,4 +1,3 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './Card'
 import { cn } from '../../lib/utils'
 
 interface SectionCardProps {
@@ -11,15 +10,15 @@ interface SectionCardProps {
 
 export function SectionCard({ title, description, action, children, className }: SectionCardProps) {
   return (
-    <Card className={cn('flex flex-col', className)}>
-      <CardHeader className="flex flex-row items-start justify-between pb-3">
-        <div className="space-y-1">
-          <CardTitle className="text-base">{title}</CardTitle>
-          {description && <CardDescription>{description}</CardDescription>}
+    <div className={cn('rounded-2xl border bg-white p-5 shadow-sm dark:bg-card', className)}>
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="text-base font-semibold tracking-tight">{title}</h3>
+          {description && <p className="text-xs text-muted-foreground">{description}</p>}
         </div>
-        {action && <div>{action}</div>}
-      </CardHeader>
-      <CardContent className="flex-1">{children}</CardContent>
-    </Card>
+        {action && <div className="flex-shrink-0">{action}</div>}
+      </div>
+      {children}
+    </div>
   )
 }

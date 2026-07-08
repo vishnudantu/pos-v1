@@ -1,41 +1,42 @@
-import { LucideIcon, TrendingDown, TrendingUp } from 'lucide-react'
-import { Card, CardContent } from './Card'
 import { cn } from '../../lib/utils'
 
 interface StatCardProps {
   label: string
-  value: string | number
-  delta?: number
-  deltaLabel?: string
-  icon: LucideIcon
+  value: React.ReactNode
+  icon: React.ElementType
+  trend?: string | number
+  trendLabel?: string
+  trendType?: 'up' | 'down' | 'neutral'
   className?: string
+  color?: string
 }
 
-export function StatCard({ label, value, delta, deltaLabel, icon: Icon, className }: StatCardProps) {
-  const positive = delta !== undefined && delta >= 0
-  const negative = delta !== undefined && delta < 0
+export function StatCard({ label, value, icon: Icon, trend, trendLabel, trendType = 'neutral', className, color }: StatCardProps) {
+  const trendColor = trendType === 'up' ? 'text-success' : trendType === 'down' ? 'text-danger' : 'text-muted-foreground'
 
   return (
-    <Card className={cn('relative overflow-hidden', className)}>
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">{label}</p>
-            <h4 className="mt-1 text-2xl font-semibold tracking-tight">{value}</h4>
-            {delta !== undefined && (
-              <div className={cn('mt-1 flex items-center gap-1 text-xs font-medium', positive ? 'text-success' : 'text-danger')}>
-                {positive ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
-                <span>
-                  {Math.abs(delta)}% {deltaLabel}
-                </span>
-              </div>
-            )}
-          </div>
-          <div className="rounded-md bg-primary/10 p-2.5 text-primary">
-            <Icon className="h-5 w-5" />
-          </div>
+    <div className={cn(
+      'group relative overflow-hidden rounded-2xl border bg-white p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 dark:bg-card',
+      className
+    )}>
+      <div className="relative flex items-start justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+          <p className="mt-2 text-3xl font-bold tracking-tight text-foreground">{value}</p>
+          {(trend !== undefined || trendLabel) && (
+            <div className="mt-2 flex items-center gap-1.5">
+              <span className={cn('text-xs font-semibold', trendColor)}>{trend !== undefined && `${trend}`}</span>
+              {trendLabel && <span className="text-xs text-muted-foreground">{trendLabel}</span>}
+            </div>
+          )}
         </div>
-      </CardContent>
-    </Card>
+        <div
+          className="flex h-12 w-12 items-center justify-center rounded-2xl"
+          style={{ background: color ? `${color}15` : 'hsl(var(--primary) / 0.1)', color: color || 'hsl(var(--primary))' }}
+        >
+          <Icon className="h-6 w-6" strokeWidth={1.8} />
+        </div>
+      </div>
+    </div>
   )
 }
