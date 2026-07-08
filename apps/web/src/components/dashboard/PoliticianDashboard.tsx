@@ -40,8 +40,9 @@ function AnimatedRing({ value, label, color }: { value: number; label: string; c
 }
 
 export function PoliticianDashboard() {
-  const { user, politician } = useAuth() as any
-  const politicianId = politician?.id
+  const { user, politician, activePolitician, allPoliticians } = useAuth() as any
+  const effectivePolitician = politician || activePolitician || allPoliticians?.[0]
+  const politicianId = effectivePolitician?.id
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -75,7 +76,8 @@ export function PoliticianDashboard() {
   if (error) return (
     <div className="p-6 text-center">
       <p className="text-danger mb-4">{error}</p>
-      <p className="text-xs text-muted-foreground">Politician ID: {politicianId || 'none'} | User: {user?.email}</p>
+      <p className="text-xs text-muted-foreground mb-4">Politician ID: {politicianId || 'none'} | User: {user?.email}</p>
+      <Button size="sm" onClick={() => window.location.reload()}>Retry</Button>
     </div>
   )
 
@@ -97,17 +99,17 @@ export function PoliticianDashboard() {
           <CardContent className="p-6">
             <div className="flex flex-col gap-6 md:flex-row md:items-center">
               <div className="relative">
-                <div className="flex h-24 w-24 items-center justify-center rounded-full border-4 border-background text-3xl font-bold text-white shadow-xl" style={{ background: politician?.color_primary || 'hsl(var(--primary))' }}>
-                  {(politician?.display_name || politician?.full_name || 'P')[0]}
+                <div className="flex h-24 w-24 items-center justify-center rounded-full border-4 border-background text-3xl font-bold text-white shadow-xl" style={{ background: effectivePolitician?.color_primary || 'hsl(var(--primary))' }}>
+                  {(effectivePolitician?.display_name || effectivePolitician?.full_name || 'P')[0]}
                 </div>
                 <div className="absolute -bottom-1 -right-1 rounded-full bg-success px-2 py-0.5 text-[10px] font-bold text-success-foreground">Active</div>
               </div>
               <div className="flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-2xl font-semibold">{politician?.display_name || politician?.full_name}</h2>
-                  <Badge variant="outline" style={{ borderColor: politician?.color_primary, color: politician?.color_primary }}>{politician?.party}</Badge>
+                  <h2 className="text-2xl font-semibold">{effectivePolitician?.display_name || effectivePolitician?.full_name}</h2>
+                  <Badge variant="outline" style={{ borderColor: effectivePolitician?.color_primary, color: effectivePolitician?.color_primary }}>{effectivePolitician?.party}</Badge>
                 </div>
-                <p className="text-sm text-muted-foreground">{politician?.designation} · {politician?.constituency_name}{politician?.state ? `, ${politician?.state}` : ''}</p>
+                <p className="text-sm text-muted-foreground">{effectivePolitician?.designation} · {effectivePolitician?.constituency_name}{effectivePolitician?.state ? `, ${effectivePolitician?.state}` : ''}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Badge variant="secondary" className="gap-1"><MapPin className="h-3 w-3" /> {data.stats?.totalBooths || 0} booths</Badge>
                   <Badge variant="secondary" className="gap-1"><MessageSquareWarning className="h-3 w-3" /> {data.stats?.pendingGrievances || 0} pending</Badge>
