@@ -1669,15 +1669,19 @@ app.get('/api/dashboard/politician/:id', authMiddleware, async (req, res) => {
       "SELECT * FROM grievances WHERE politician_id = ? AND priority = 'urgent' AND status NOT IN ('resolved','rejected') ORDER BY created_at DESC LIMIT 5",
       [politicianId]
     );
-    const [pendingActions] = await pool.query(
-      `SELECT 'grievance' as type, id, title as label, status, created_at, due_date, priority
-       FROM grievances WHERE politician_id = ? AND status NOT IN ('resolved','rejected')
-       UNION ALL
-       SELECT 'event' as type, id, title as label, status, event_date as created_at, event_date as due_date, 'medium' as priority
-       FROM events WHERE politician_id = ? AND event_date >= CURDATE()
-       ORDER BY due_date IS NULL, due_date ASC LIMIT 10`,
-      [politicianId, politicianId]
-    );
+    let pendingActions = [];
+    try {
+      const [grievanceActions] = await pool.query(
+        `SELECT 'grievance' as type, id, title as label, status, created_at, due_date, priority
+         FROM grievances WHERE politician_id = ? AND status NOT IN ('resolved','rejected')
+         ORDER BY due_date IS NULL, due_date ASC, created_at DESC LIMIT 10`,
+        [politicianId]
+      );
+      pendingActions = (grievanceActions || []).map((g) => ({ ...g, type: 'grievance' }));
+    } catch (e) {
+      console.error('[dashboard] grievance actions error:', e);
+      pendingActions = [];
+    }
     const [recentMedia] = await pool.query(
       "SELECT * FROM media_mentions WHERE politician_id = ? ORDER BY created_at DESC LIMIT 5",
       [politicianId]
