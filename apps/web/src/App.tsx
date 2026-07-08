@@ -77,6 +77,7 @@ import ElectionCommandCenter from './pages/ElectionCommandCenter';
 import FinancialCompliance from './pages/FinancialCompliance';
 import PartyIntegration from './pages/PartyIntegration';
 import DigitalTwin from './pages/DigitalTwin';
+import PoliticianProfile from './pages/politician/PoliticianProfile';
 import SuperAdmin from './pages/SuperAdmin';
 import PartyManager from './pages/PartyManager';
 import StaffManagement from './pages/StaffManagement';
@@ -107,6 +108,7 @@ function AppContent() {
 
         {/* Founder / God Mode */}
         <Route path="/founder/political-health" element={<PoliticalHealth />} />
+        <Route path="/politician/:id" element={<PoliticianProfile />} />
         <Route path="/founder/public" element={<PublicWebsite />} />
         <Route path="/founder/parties" element={<Parties />} />
         <Route path="/founder/politicians" element={<Politicians />} />

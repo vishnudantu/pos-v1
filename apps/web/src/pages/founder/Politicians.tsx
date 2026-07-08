@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Pencil, Trash2, Users, ArrowRightLeft, UserX, History } from 'lucide-react'
+import { Plus, Pencil, Trash2, Users, ArrowRightLeft, UserX, History, User } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { apiGet, apiPost, apiPut, apiDelete } from '../../lib/api'
 import { Button } from '../../components/primitives/Button'
 import { Card, CardContent } from '../../components/primitives/Card'
@@ -239,6 +240,7 @@ export default function Politicians() {
                       <Button variant="ghost" size="sm" onClick={() => openPartySwitch(p)}>
                         <ArrowRightLeft className="mr-2 h-4 w-4" /> Switch Party
                       </Button>
+                      <Link to={`/politician/${p.id}`}><Button variant="ghost" size="sm" className="h-8"><User className="mr-1 h-4 w-4" /> Profile</Button></Link>
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(p)}>
                         <Pencil className="h-4 w-4" />
                       </Button>
