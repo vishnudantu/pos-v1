@@ -18,6 +18,7 @@ import SystemHealth from './pages/founder/SystemHealth';
 import PublicWebsite from './pages/founder/PublicWebsite';
 import PoliticalHealth from './pages/founder/PoliticalHealth';
 import PlatformSettings from './pages/founder/PlatformSettings';
+import DashboardDebug from './pages/founder/DashboardDebug';
 
 // Operations modules
 import Grievances from './pages/Grievances';
@@ -120,6 +121,7 @@ function AppContent() {
         <Route path="/founder/exports" element={<Exports />} />
         <Route path="/founder/system" element={<SystemHealth />} />
         <Route path="/founder/platform-settings" element={<PlatformSettings />} />
+        <Route path="/founder/dashboard-debug" element={<DashboardDebug />} />
 
         {/* Operations */}
         <Route path="/grievances" element={<Grievances />} />
