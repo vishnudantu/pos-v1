@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { CreditCard, Plus, Pencil, ArrowUpRight } from 'lucide-react'
-import { apiGet, apiPost, apiPut } from '../../lib/api'
+import { CreditCard, Pencil, Calendar, Building2 } from 'lucide-react'
+import { api } from '../../lib/api'
 import { Button } from '../../components/primitives/Button'
 import { Card, CardContent } from '../../components/primitives/Card'
 import { Badge } from '../../components/primitives/Badge'
@@ -8,27 +8,38 @@ import { SectionCard } from '../../components/primitives/SectionCard'
 import { EmptyState } from '../../components/primitives/EmptyState'
 import { Loading } from '../../components/primitives/Loading'
 import { Modal } from '../../components/primitives/Modal'
-import { Input } from '../../components/primitives/Input'
 import { Select } from '../../components/primitives/Select'
+import { Input } from '../../components/primitives/Input'
 
 export default function Subscriptions() {
   const [parties, setParties] = useState<any[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<any | null>(null)
   const [form, setForm] = useState<Record<string, any>>({})
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
+  async function fetchParties() {
     setLoading(true)
-    api.list('parties').then((r) => r.json()).then((d) => setParties(list || [])).finally(() => setLoading(false))
+    try {
+      const list = await api.list('parties')
+      setParties(Array.isArray(list) ? list : [])
+    } catch (e: any) {
+      console.error('[subscriptions] fetch error:', e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchParties()
   }, [])
 
   function openEdit(p: any) {
     setEditing(p)
     setForm({
-      subscription_plan: p.subscription_plan,
-      subscription_status: p.subscription_status,
+      subscription_plan: p.subscription_plan || 'trial',
+      subscription_status: p.subscription_status || 'active',
       subscription_expires: p.subscription_expires ? p.subscription_expires.slice(0, 10) : '',
     })
     setDialogOpen(true)
@@ -44,30 +55,29 @@ export default function Subscriptions() {
     try {
       await api.update('parties', editing.id, { ...editing, ...form })
       setDialogOpen(false)
-      const r = await api.list('parties')
-      
-      setParties(list || [])
-    } catch (e) {
+      await fetchParties()
+    } catch (e: any) {
       console.error('[subscriptions] save error:', e)
-      alert('Save failed.')
+      alert('Save failed: ' + e.message)
     } finally {
       setSaving(false)
     }
   }
+
+  if (loading) return <Loading text="Loading subscriptions..." className="min-h-[60vh]" />
 
   return (
     <div className="mx-auto max-w-[1600px] space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Subscriptions & Billing</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Manage party plans, status, and renewal dates.</p>
+          <p className="text-sm text-muted-foreground">Manage party plans, status, and renewal dates.</p>
         </div>
-        <Button size="sm" variant="outline"><CreditCard className="mr-2 h-4 w-4" /> Billing Portal</Button>
       </div>
 
       <SectionCard title="Party Subscriptions" action={parties.length > 0 ? <span className="text-xs text-muted-foreground">{parties.length} parties</span> : null}>
-        {loading ? <Loading text="Loading subscriptions..." /> : parties.length === 0 ? (
-          <EmptyState icon={CreditCard} title="No parties" description="Create parties first to manage subscriptions." />
+        {parties.length === 0 ? (
+          <EmptyState icon={Building2} title="No parties" description="Create parties first to manage subscriptions." />
         ) : (
           <div className="space-y-3">
             {parties.map((p) => (
@@ -77,7 +87,7 @@ export default function Subscriptions() {
                     <div>
                       <div className="flex items-center gap-2">
                         <p className="font-medium">{p.name}</p>
-                        <Badge variant="outline">{p.subscription_plan?.toUpperCase()}</Badge>
+                        <Badge variant="outline">{p.subscription_plan ? p.subscription_plan.toUpperCase() : 'NO PLAN'}</Badge>
                         <Badge variant={p.subscription_status === 'active' ? 'success' : p.subscription_status === 'paused' ? 'warning' : 'secondary'}>{p.subscription_status}</Badge>
                       </div>
                       <p className="text-xs text-muted-foreground">Expires: {p.subscription_expires || 'Not set'}</p>
