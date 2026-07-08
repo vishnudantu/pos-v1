@@ -1615,6 +1615,117 @@ app.get('/api/founder/reports/political-health', authMiddleware, async (req, res
 });
 
 
+
+
+// ── POLITICIAN DASHBOARD ──────────────────────────────────────
+app.get('/api/dashboard/politician/:id', authMiddleware, async (req, res) => {
+  const politicianId = req.params.id;
+  const user = req.user;
+  const isAdmin = user.role === 'super_admin' || user.role === 'founder';
+  if (!isAdmin && String(user.politician_id) !== String(politicianId)) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  try {
+    const [[pendingGrievances]] = await pool.query(
+      "SELECT COUNT(*) as total FROM grievances WHERE politician_id = ? AND status NOT IN ('resolved','rejected')",
+      [politicianId]
+    );
+    const [[mediaCount]] = await pool.query(
+      "SELECT COUNT(*) as total FROM media_mentions WHERE politician_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)",
+      [politicianId]
+    );
+    const [[eventsCount]] = await pool.query(
+      "SELECT COUNT(*) as total FROM events WHERE politician_id = ? AND event_date >= CURDATE()",
+      [politicianId]
+    );
+    const [[boothCount]] = await pool.query(
+      "SELECT COUNT(*) as total FROM booths WHERE politician_id = ?",
+      [politicianId]
+    );
+    const [[weakBooths]] = await pool.query(
+      "SELECT COUNT(*) as total FROM booths WHERE politician_id = ? AND strength_score < 60",
+      [politicianId]
+    );
+    const [urgentGrievances] = await pool.query(
+      "SELECT * FROM grievances WHERE politician_id = ? AND priority = 'urgent' AND status NOT IN ('resolved','rejected') ORDER BY created_at DESC LIMIT 5",
+      [politicianId]
+    );
+    const [pendingActions] = await pool.query(
+      `SELECT 'grievance' as type, id, title as label, status, created_at, due_date, priority
+       FROM grievances WHERE politician_id = ? AND status NOT IN ('resolved','rejected')
+       UNION ALL
+       SELECT 'event' as type, id, title as label, status, event_date as created_at, event_date as due_date, 'medium' as priority
+       FROM events WHERE politician_id = ? AND event_date >= CURDATE()
+       ORDER BY due_date IS NULL, due_date ASC LIMIT 10`,
+      [politicianId, politicianId]
+    );
+    const [recentMedia] = await pool.query(
+      "SELECT * FROM media_mentions WHERE politician_id = ? ORDER BY created_at DESC LIMIT 5",
+      [politicianId]
+    );
+
+    res.json({
+      stats: {
+        pendingGrievances: pendingGrievances.total || 0,
+        mediaMentions24h: mediaCount.total || 0,
+        upcomingEvents: eventsCount.total || 0,
+        boothStrength: boothCount.total ? Math.round(((boothCount.total - weakBooths.total) / boothCount.total) * 100) : 0,
+        weakBooths: weakBooths.total || 0,
+        totalBooths: boothCount.total || 0
+      },
+      urgentGrievances,
+      pendingActions,
+      recentMedia
+    });
+  } catch (err) {
+    console.error('[politician-dashboard] error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── QUICK CAPTURE ─────────────────────────────────────────────
+app.post('/api/quick-capture', authMiddleware, async (req, res) => {
+  try {
+    const { type, title, description, citizen_name, citizen_phone, location, priority, photo_url, audio_url, politician_id } = req.body;
+    const pid = politician_id || req.user.politician_id;
+    if (!pid) return res.status(400).json({ error: 'Politician not assigned' });
+
+    if (type === 'grievance') {
+      const [result] = await pool.query(
+        `INSERT INTO grievances (politician_id, title, description, citizen_name, citizen_phone, priority, status, category, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'new', 'General', NOW())`,
+        [pid, title, description, citizen_name, citizen_phone, priority || 'medium']
+      );
+      return res.json({ success: true, id: result.insertId, type: 'grievance' });
+    }
+
+    if (type === 'visit') {
+      const [result] = await pool.query(
+        `INSERT INTO events (politician_id, title, description, location, event_date, status, created_at)
+         VALUES (?, ?, ?, ?, CURDATE(), 'scheduled', NOW())`,
+        [pid, title, description, location]
+      );
+      return res.json({ success: true, id: result.insertId, type: 'visit' });
+    }
+
+    if (type === 'feedback') {
+      const [result] = await pool.query(
+        `INSERT INTO public_ratings (politician_id, rating, review, source, created_at)
+         VALUES (?, ?, ?, 'quick_capture', NOW())`,
+        [pid, 4, description]
+      );
+      return res.json({ success: true, id: result.insertId, type: 'feedback' });
+    }
+
+    res.status(400).json({ error: 'Unknown capture type' });
+  } catch (err) {
+    console.error('[quick-capture] error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 // ── END FOUNDER API ───────────────────────────────────────────
 
 // ── TEMPLE DARSHAN API ───────────────────────────────────────

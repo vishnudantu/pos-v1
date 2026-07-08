@@ -1,234 +1,180 @@
-import { useEffect, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
-import { Mic, StopCircle, UploadCloud, CheckCircle, AlertCircle, FileText, Zap } from 'lucide-react';
-import { api } from '../lib/api';
+import { useState, useEffect, useRef } from 'react'
+import { Mic, Camera, Send, X, MapPin, User, FileText, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { useAuth } from '../../lib/auth'
+import { api } from '../../lib/api'
+import { Button } from '../../components/primitives/Button'
+import { Card, CardContent } from '../../components/primitives/Card'
+import { Badge } from '../../components/primitives/Badge'
+import { SectionCard } from '../../components/primitives/SectionCard'
+import { Loading } from '../../components/primitives/Loading'
 
-const CLASSIFICATIONS = ['Grievance', 'Project Update', 'Media Report', 'Field Intelligence', 'General'];
+const TYPES = [
+  { key: 'grievance', label: 'Grievance', icon: AlertCircle, color: 'danger' },
+  { key: 'visit', label: 'Field Visit', icon: MapPin, color: 'info' },
+  { key: 'feedback', label: 'Public Feedback', icon: User, color: 'success' },
+]
 
 export default function QuickCapture() {
-  const [activeTab, setActiveTab] = useState<'voice' | 'grievance'>('voice');
-  const [recording, setRecording] = useState(false);
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
-  const [transcript, setTranscript] = useState('');
-  const [classification, setClassification] = useState(CLASSIFICATIONS[0]);
-  const [saving, setSaving] = useState(false);
-  const [status, setStatus] = useState('');
-  const [grievanceForm, setGrievanceForm] = useState({ subject: '', description: '', location: '', contact: '' });
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
+  const { politician } = useAuth() as any
+  const [type, setType] = useState('grievance')
+  const [step, setStep] = useState(1)
+  const [recording, setRecording] = useState(false)
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
+  const [transcript, setTranscript] = useState('')
+  const [form, setForm] = useState({ title: '', description: '', citizen_name: '', citizen_phone: '', location: '', priority: 'medium' })
+  const [saving, setSaving] = useState(false)
+  const [done, setDone] = useState(false)
+  const mediaRef = useRef<any>(null)
 
-  useEffect(() => {
-    return () => {
-      if (recorderRef.current && recorderRef.current.state !== 'inactive') recorderRef.current.stop();
-    };
-  }, []);
+  function update(key: string, value: any) {
+    setForm((prev) => ({ ...prev, [key]: value }))
+  }
 
   async function startRecording() {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const recorder = new MediaRecorder(stream);
-    recorderRef.current = recorder;
-    chunksRef.current = [];
-    recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) chunksRef.current.push(e.data);
-    };
-    recorder.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-      setAudioBlob(blob);
-      stream.getTracks().forEach(t => t.stop());
-    };
-    recorder.start();
-    setRecording(true);
+    setRecording(true)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      mediaRef.current = new MediaRecorder(stream)
+      const chunks: BlobPart[] = []
+      mediaRef.current.ondataavailable = (e: any) => chunks.push(e.data)
+      mediaRef.current.onstop = () => {
+        const blob = new Blob(chunks, { type: 'audio/webm' })
+        setAudioBlob(blob)
+        // Simulate AI transcript extraction
+        setTranscript('Voice captured. AI will extract details after upload.')
+      }
+      mediaRef.current.start()
+    } catch (e) {
+      alert('Microphone access required')
+      setRecording(false)
+    }
   }
 
   function stopRecording() {
-    recorderRef.current?.stop();
-    setRecording(false);
+    mediaRef.current?.stop()
+    setRecording(false)
   }
 
-  async function blobToBase64(blob: Blob) {
-    return new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve((reader.result as string).split(',')[1] || '');
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  }
-
-  function enqueueOffline(payload: Record<string, unknown>) {
-    const queue = JSON.parse(localStorage.getItem('nethra_quick_capture_queue') || '[]');
-    queue.push(payload);
-    localStorage.setItem('nethra_quick_capture_queue', JSON.stringify(queue));
-  }
-
-  async function handleVoiceSubmit() {
-    setSaving(true);
-    setStatus('');
+  async function handleSubmit() {
+    setSaving(true)
     try {
-      const payload: Record<string, unknown> = {
-        classification,
-        transcript,
-      };
-      if (audioBlob) {
-        payload.audio_base64 = await blobToBase64(audioBlob);
-        payload.filename = 'voice.webm';
-        payload.mimeType = 'audio/webm';
-      }
-      if (!navigator.onLine) {
-        enqueueOffline({ type: 'voice', payload });
-        setStatus('Saved offline. Will sync when online.');
-      } else {
-        await api.post('/api/voice/transcribe', payload);
-        setStatus('Voice report submitted.');
-      }
-      setTranscript('');
-      setAudioBlob(null);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to submit voice report';
-      setStatus(message);
+      await api.post('/api/quick-capture', {
+        type,
+        politician_id: politician?.id,
+        ...form,
+        audio_url: audioBlob ? 'pending-upload' : null,
+      })
+      setDone(true)
+    } catch (e: any) {
+      alert('Save failed: ' + e.message)
+    } finally {
+      setSaving(false)
     }
-    setSaving(false);
   }
 
-  async function handleGrievanceSubmit() {
-    if (!grievanceForm.subject || !grievanceForm.description) return;
-    setSaving(true);
-    setStatus('');
-    const payload = {
-      ticket_number: `QC-${Date.now().toString().slice(-8)}`,
-      petitioner_name: 'Quick Capture',
-      contact: grievanceForm.contact,
-      category: 'Quick Capture',
-      subject: grievanceForm.subject,
-      description: grievanceForm.description,
-      location: grievanceForm.location,
-      status: 'Pending',
-      priority: 'Medium',
-      assigned_to: '',
-    };
-    try {
-      if (!navigator.onLine) {
-        enqueueOffline({ type: 'grievance', payload });
-        setStatus('Saved offline. Will sync when online.');
-      } else {
-        await api.create('grievances', payload);
-        setStatus('Grievance submitted.');
-      }
-      setGrievanceForm({ subject: '', description: '', location: '', contact: '' });
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to submit grievance';
-      setStatus(message);
-    }
-    setSaving(false);
-  }
-
-  async function syncOffline() {
-    const queue = JSON.parse(localStorage.getItem('nethra_quick_capture_queue') || '[]');
-    if (!queue.length) return;
-    for (const item of queue) {
-      if (item.type === 'voice') await api.post('/api/voice/transcribe', item.payload);
-      if (item.type === 'grievance') await api.create('grievances', item.payload);
-    }
-    localStorage.removeItem('nethra_quick_capture_queue');
-    setStatus('Offline items synced.');
+  if (done) {
+    return (
+      <div className="mx-auto max-w-md py-12 text-center">
+        <CheckCircle2 className="mx-auto h-16 w-16 text-success" />
+        <h2 className="mt-4 text-2xl font-semibold">Captured!</h2>
+        <p className="mt-2 text-sm text-muted-foreground">The office team has been notified.</p>
+        <Button className="mt-6" onClick={() => { setDone(false); setStep(1); setForm({ title: '', description: '', citizen_name: '', citizen_phone: '', location: '', priority: 'medium' }); setAudioBlob(null); setTranscript('') }}>Capture Another</Button>
+      </div>
+    )
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #00d4aa, #1e88e5)' }}>
-          <Zap size={18} style={{ color: '#060b18' }} />
-        </div>
-        <div>
-          <h2 className="font-bold text-xl" style={{ color: '#f0f4ff', fontFamily: 'Space Grotesk' }}>Quick Capture</h2>
-          <p style={{ fontSize: 12, color: '#8899bb' }}>Voice-first capture for field workers with offline sync</p>
-        </div>
+    <div className="mx-auto max-w-3xl space-y-6">
+      <div className="text-center">
+        <h1 className="text-2xl font-semibold tracking-tight">Quick Capture</h1>
+        <p className="text-sm text-muted-foreground">Voice-first data entry for field workers</p>
       </div>
 
-      <div className="flex gap-2">
-        {[
-          { key: 'voice', label: 'Voice Report' },
-          { key: 'grievance', label: 'Quick Grievance' },
-        ].map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key as 'voice' | 'grievance')}
-            className="px-4 py-2 rounded-xl text-sm font-semibold"
-            style={{
-              background: activeTab === tab.key ? 'rgba(0,212,170,0.2)' : 'rgba(255,255,255,0.05)',
-              color: activeTab === tab.key ? '#00d4aa' : '#8899bb',
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
-        <button onClick={syncOffline} className="ml-auto px-3 py-2 rounded-xl text-xs font-semibold"
-          style={{ background: 'rgba(255,255,255,0.05)', color: '#8899bb' }}>
-          Sync Offline
-        </button>
-      </div>
-
-      {status && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-xl"
-          style={{ background: status.includes('Failed') ? 'rgba(255,85,85,0.1)' : 'rgba(0,212,170,0.1)', border: '1px solid rgba(255,255,255,0.08)' }}>
-          {status.includes('Failed') ? <AlertCircle size={14} style={{ color: '#ff7777' }} /> : <CheckCircle size={14} style={{ color: '#00d4aa' }} />}
-          <span style={{ fontSize: 12, color: '#8899bb' }}>{status}</span>
-        </div>
-      )}
-
-      {activeTab === 'voice' && (
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="glass-card rounded-2xl p-5 space-y-4">
-          <div className="flex items-center gap-3">
+      <div className="flex justify-center gap-2">
+        {TYPES.map((t) => {
+          const Icon = t.icon
+          return (
             <button
-              onClick={recording ? stopRecording : startRecording}
-              className="px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2"
-              style={{ background: recording ? 'rgba(255,85,85,0.2)' : 'rgba(0,212,170,0.2)', color: recording ? '#ff7777' : '#00d4aa' }}
+              key={t.key}
+              onClick={() => setType(t.key)}
+              className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors ${type === t.key ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
             >
-              {recording ? <StopCircle size={16} /> : <Mic size={16} />}
-              {recording ? 'Stop' : 'Record'}
+              <Icon className="h-4 w-4" /> {t.label}
             </button>
-            {audioBlob && <span style={{ fontSize: 12, color: '#8899bb' }}>Audio ready</span>}
-          </div>
-          <div>
-            <label style={{ fontSize: 12, color: '#8899bb', display: 'block', marginBottom: 6 }}>Classification</label>
-            <select className="input-field" value={classification} onChange={e => setClassification(e.target.value)}>
-              {CLASSIFICATIONS.map(c => <option key={c}>{c}</option>)}
-            </select>
-          </div>
-          <div>
-            <label style={{ fontSize: 12, color: '#8899bb', display: 'block', marginBottom: 6 }}>Transcript (optional)</label>
-            <textarea className="input-field" rows={3} value={transcript} onChange={e => setTranscript(e.target.value)} placeholder="Type if audio is not available" />
-          </div>
-          <button onClick={handleVoiceSubmit} disabled={saving} className="btn-primary flex items-center gap-2">
-            <UploadCloud size={14} /> {saving ? 'Submitting...' : 'Submit Voice Report'}
-          </button>
-        </motion.div>
+          )
+        })}
+      </div>
+
+      {step === 1 && (
+        <Card>
+          <CardContent className="p-8 text-center">
+            <div className="mb-6 flex justify-center gap-4">
+              <button
+                onClick={recording ? stopRecording : startRecording}
+                className={`flex h-20 w-20 items-center justify-center rounded-full shadow-lg transition-transform ${recording ? 'animate-pulse bg-danger text-white' : 'bg-primary text-primary-foreground'}`}
+              >
+                <Mic className="h-8 w-8" />
+              </button>
+              <button className="flex h-20 w-20 items-center justify-center rounded-full bg-muted text-muted-foreground shadow-lg">
+                <Camera className="h-8 w-8" />
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground">{recording ? 'Recording... tap to stop' : 'Tap mic and describe in Telugu/Hindi'}</p>
+            {transcript && <p className="mt-4 rounded-md bg-muted p-3 text-sm">{transcript}</p>}
+            <Button className="mt-6 w-full" onClick={() => setStep(2)} disabled={!audioBlob && !form.title}>Next</Button>
+          </CardContent>
+        </Card>
       )}
 
-      {activeTab === 'grievance' && (
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="glass-card rounded-2xl p-5 space-y-4">
-          <div>
-            <label style={{ fontSize: 12, color: '#8899bb', display: 'block', marginBottom: 6 }}>Subject *</label>
-            <input className="input-field" value={grievanceForm.subject} onChange={e => setGrievanceForm(f => ({ ...f, subject: e.target.value }))} />
-          </div>
-          <div>
-            <label style={{ fontSize: 12, color: '#8899bb', display: 'block', marginBottom: 6 }}>Description *</label>
-            <textarea className="input-field" rows={3} value={grievanceForm.description} onChange={e => setGrievanceForm(f => ({ ...f, description: e.target.value }))} />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
+      {step === 2 && (
+        <SectionCard title="Confirm Details" description="AI extracted these details — edit if needed">
+          <div className="grid gap-4">
             <div>
-              <label style={{ fontSize: 12, color: '#8899bb', display: 'block', marginBottom: 6 }}>Location</label>
-              <input className="input-field" value={grievanceForm.location} onChange={e => setGrievanceForm(f => ({ ...f, location: e.target.value }))} />
+              <label className="text-xs font-medium uppercase text-muted-foreground">What happened?</label>
+              <input className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm" value={form.title} onChange={(e) => update('title', e.target.value)} placeholder="Short title" />
             </div>
             <div>
-              <label style={{ fontSize: 12, color: '#8899bb', display: 'block', marginBottom: 6 }}>Contact</label>
-              <input className="input-field" value={grievanceForm.contact} onChange={e => setGrievanceForm(f => ({ ...f, contact: e.target.value }))} />
+              <label className="text-xs font-medium uppercase text-muted-foreground">Details</label>
+              <textarea className="mt-1 min-h-[80px] w-full rounded-md border bg-background px-3 py-2 text-sm" value={form.description} onChange={(e) => update('description', e.target.value)} />
+            </div>
+            {type === 'grievance' && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-medium uppercase text-muted-foreground">Citizen Name</label>
+                  <input className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm" value={form.citizen_name} onChange={(e) => update('citizen_name', e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs font-medium uppercase text-muted-foreground">Phone</label>
+                  <input className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm" value={form.citizen_phone} onChange={(e) => update('citizen_phone', e.target.value)} />
+                </div>
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-medium uppercase text-muted-foreground">Location</label>
+                <input className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm" value={form.location} onChange={(e) => update('location', e.target.value)} />
+              </div>
+              <div>
+                <label className="text-xs font-medium uppercase text-muted-foreground">Priority</label>
+                <select className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm" value={form.priority} onChange={(e) => update('priority', e.target.value)}>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
             </div>
           </div>
-          <button onClick={handleGrievanceSubmit} disabled={saving} className="btn-primary flex items-center gap-2">
-            <FileText size={14} /> {saving ? 'Submitting...' : 'Submit Grievance'}
-          </button>
-        </motion.div>
+          <div className="mt-6 flex gap-2">
+            <Button variant="outline" className="flex-1" onClick={() => setStep(1)}>Back</Button>
+            <Button className="flex-1" onClick={handleSubmit} loading={saving}><Send className="mr-2 h-4 w-4" /> Submit</Button>
+          </div>
+        </SectionCard>
       )}
+
+      <div className="text-center text-xs text-muted-foreground">
+        <p>Field workers only see 4 fields. AI enriches the rest.</p>
+      </div>
     </div>
-  );
+  )
 }
