@@ -1639,14 +1639,32 @@ app.get('/api/dashboard/politician/:id', authMiddleware, async (req, res) => {
       "SELECT COUNT(*) as total FROM events WHERE politician_id = ? AND event_date >= CURDATE()",
       [politicianId]
     );
-    const [[boothCount]] = await pool.query(
-      "SELECT COUNT(*) as total FROM booths WHERE politician_id = ?",
-      [politicianId]
-    );
-    const [[weakBooths]] = await pool.query(
-      "SELECT COUNT(*) as total FROM booths WHERE politician_id = ? AND strength_score < 60",
-      [politicianId]
-    );
+    let boothCount = { total: 0 };
+    try {
+      [[boothCount]] = await pool.query(
+        "SELECT COUNT(*) as total FROM booths WHERE politician_id = ?",
+        [politicianId]
+      );
+    } catch (e) {
+      boothCount = { total: 0 };
+    }
+    let weakBooths = { total: 0 };
+    try {
+      [[weakBooths]] = await pool.query(
+        "SELECT COUNT(*) as total FROM booths WHERE politician_id = ? AND strength_score < 60",
+        [politicianId]
+      );
+    } catch (e) {
+      // Fallback if strength_score column doesn't exist
+      try {
+        [[weakBooths]] = await pool.query(
+          "SELECT COUNT(*) as total FROM booths WHERE politician_id = ? AND priority = 'weak'",
+          [politicianId]
+        );
+      } catch (e2) {
+        weakBooths = { total: 0 };
+      }
+    }
     const [urgentGrievances] = await pool.query(
       "SELECT * FROM grievances WHERE politician_id = ? AND priority = 'urgent' AND status NOT IN ('resolved','rejected') ORDER BY created_at DESC LIMIT 5",
       [politicianId]
