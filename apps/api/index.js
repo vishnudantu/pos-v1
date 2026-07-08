@@ -1748,6 +1748,78 @@ app.post('/api/quick-capture', authMiddleware, async (req, res) => {
 });
 
 
+
+
+// ── VOTERS CRUD ───────────────────────────────────────────────
+app.get('/api/voters', authMiddleware, async (req, res) => {
+  try {
+    const politicianId = req.query.politician_id || req.user.politician_id;
+    const [rows] = await pool.query(
+      'SELECT * FROM voters WHERE (? IS NULL OR politician_id = ?) AND is_active = 1 ORDER BY created_at DESC',
+      [politicianId, politicianId]
+    );
+    res.json({ data: rows || [] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/voters', authMiddleware, async (req, res) => {
+  try {
+    const data = req.body;
+    const politicianId = data.politician_id || req.user.politician_id;
+    if (!politicianId) return res.status(400).json({ error: 'Politician not assigned' });
+    const [result] = await pool.query(
+      `INSERT INTO voters (politician_id, voter_id, full_name, phone, age, gender, mandal, village, booth, caste_category, party_affiliation, support_level, notes, is_active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+      [politicianId, data.voter_id, data.full_name, data.phone, data.age, data.gender, data.mandal, data.village, data.booth, data.caste_category, data.party_affiliation || 'Undecided', data.support_level || 'undecided', data.notes]
+    );
+    res.status(201).json({ id: result.insertId, ...data });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/voters/:id', authMiddleware, async (req, res) => {
+  try {
+    const data = req.body;
+    const [rows] = await pool.query('SELECT * FROM voters WHERE id = ?', [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    const existing = rows[0];
+    await pool.query(
+      `UPDATE voters SET voter_id = ?, full_name = ?, phone = ?, age = ?, gender = ?, mandal = ?, village = ?, booth = ?, caste_category = ?, party_affiliation = ?, support_level = ?, notes = ? WHERE id = ?`,
+      [
+        data.voter_id || existing.voter_id,
+        data.full_name || existing.full_name,
+        data.phone !== undefined ? data.phone : existing.phone,
+        data.age !== undefined ? data.age : existing.age,
+        data.gender !== undefined ? data.gender : existing.gender,
+        data.mandal !== undefined ? data.mandal : existing.mandal,
+        data.village !== undefined ? data.village : existing.village,
+        data.booth !== undefined ? data.booth : existing.booth,
+        data.caste_category !== undefined ? data.caste_category : existing.caste_category,
+        data.party_affiliation || existing.party_affiliation,
+        data.support_level || existing.support_level,
+        data.notes !== undefined ? data.notes : existing.notes,
+        req.params.id
+      ]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/voters/:id', authMiddleware, async (req, res) => {
+  try {
+    await pool.query('UPDATE voters SET is_active = 0 WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 // ── END FOUNDER API ───────────────────────────────────────────
 
 // ── TEMPLE DARSHAN API ───────────────────────────────────────
