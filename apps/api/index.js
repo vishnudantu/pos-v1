@@ -1507,6 +1507,114 @@ app.post('/api/integrations/:id/test', authMiddleware, async (req, res) => {
 });
 
 
+
+
+// ── POLITICAL HEALTH REPORT ───────────────────────────────────
+app.get('/api/founder/reports/political-health', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' });
+  try {
+    let partyCount = { total: 0 };
+    try {
+      [[partyCount]] = await pool.query('SELECT COUNT(*) as total FROM parties WHERE is_active = 1');
+    } catch (e) { partyCount = { total: 0 }; }
+
+    const [[politicianCount]] = await pool.query('SELECT COUNT(*) as total FROM politician_profiles WHERE is_active = 1');
+    const [[inactivePoliticianCount]] = await pool.query('SELECT COUNT(*) as total FROM politician_profiles WHERE is_active = 0');
+    const [[userCount]] = await pool.query('SELECT COUNT(*) as total FROM users WHERE is_active = 1');
+
+    let integrationCount = { total: 0 };
+    try {
+      [[integrationCount]] = await pool.query("SELECT COUNT(*) as total FROM party_integrations WHERE status = 'connected'");
+    } catch (e) { integrationCount = { total: 0 }; }
+
+    const [activeSubscriptions] = await pool.query(`
+      SELECT subscription_plan, COUNT(*) as count
+      FROM parties
+      WHERE is_active = 1
+      GROUP BY subscription_plan
+    `);
+
+    const [politicians] = await pool.query(
+      `SELECT pp.id, pp.full_name, pp.display_name, pp.party, pp.constituency_name, pp.state,
+              pp.is_active, pp.created_at, pp.updated_at,
+              p.name as party_name, p.subscription_plan, p.subscription_status as party_subscription_status,
+              p.subscription_expires, p.color_primary as party_color
+       FROM politician_profiles pp
+       LEFT JOIN parties p ON pp.party_id = p.id
+       ORDER BY pp.full_name`
+    );
+
+    const now = new Date();
+
+    const politicianHealth = politicians.map((p) => {
+      const plan = p.subscription_plan || 'none';
+      const status = p.party_subscription_status || 'none';
+
+      let healthScore = 75;
+      if (!p.is_active) healthScore -= 40;
+      if (status === 'expired' || status === 'cancelled') healthScore -= 30;
+      if (status === 'paused') healthScore -= 15;
+      if (plan === 'trial') healthScore -= 10;
+      if (!p.party_name) healthScore -= 20;
+
+      healthScore = Math.max(0, Math.min(100, healthScore));
+
+      let state = 'strong';
+      if (healthScore < 40) state = 'critical';
+      else if (healthScore < 60) state = 'at-risk';
+      else if (healthScore < 75) state = 'competitive';
+
+      const daysToExpiry = p.subscription_expires
+        ? Math.max(0, Math.round((new Date(p.subscription_expires).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
+        : null;
+
+      const daysSinceUpdate = p.updated_at
+        ? Math.max(1, Math.round((now.getTime() - new Date(p.updated_at).getTime()) / (1000 * 60 * 60 * 24)))
+        : 30;
+
+      return {
+        id: p.id,
+        name: p.display_name || p.full_name,
+        constituency: p.constituency_name,
+        state: p.state,
+        party: p.party_name || p.party || 'Independent',
+        party_color: p.party_color || p.color_primary || '#3b82f6',
+        healthScore,
+        isActive: !!p.is_active,
+        plan,
+        status,
+        partySubscriptionStatus: status,
+        daysSinceUpdate,
+        daysToExpiry,
+        state,
+      };
+    });
+
+    const planCounts = activeSubscriptions.reduce((acc, row) => {
+      acc[row.subscription_plan || 'none'] = row.count;
+      return acc;
+    }, {});
+
+    res.json({
+      summary: {
+        parties: partyCount.total,
+        politicians: politicianCount.total,
+        inactive: inactivePoliticianCount.total,
+        activeUsers: userCount.total,
+        connectedIntegrations: integrationCount.total,
+        critical: politicianHealth.filter((p) => p.state === 'critical' || p.state === 'at-risk').length,
+        planCounts,
+        generated_at: new Date(),
+      },
+      politicians: politicianHealth,
+    });
+  } catch (err) {
+    console.error('[political-health] error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 // ── END FOUNDER API ───────────────────────────────────────────
 
 // ── TEMPLE DARSHAN API ───────────────────────────────────────
