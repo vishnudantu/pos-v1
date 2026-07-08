@@ -8,18 +8,9 @@ import {
   Activity,
   Plus,
   Settings,
-  CheckCircle2,
-  CreditCard,
   Globe,
+  CreditCard,
   AlertTriangle,
-  Cpu,
-  Lock,
-  Bot,
-  MessageSquareWarning,
-  Sparkles,
-  Newspaper,
-  Smartphone,
-  Landmark,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { StatCard } from '../primitives/StatCard'
@@ -30,19 +21,6 @@ import { EmptyState } from '../primitives/EmptyState'
 import { Loading } from '../primitives/Loading'
 import { DashboardLayout } from './DashboardLayout'
 import { api } from '../../lib/api'
-
-const ALL_FEATURES = [
-  { id: 'ai-studio', label: 'AI Studio', icon: Sparkles, description: 'Prompts, agents, training' },
-  { id: 'omniscan', label: 'OmniScan Media', icon: Newspaper, description: 'RSS + news monitoring' },
-  { id: 'whatsapp-intel', label: 'WhatsApp Intelligence', icon: Smartphone, description: 'Group ingestion + classification' },
-  { id: 'darshan', label: 'Tirupati Darshan', icon: Landmark, description: 'Temple booking workflow' },
-  { id: 'grievances', label: 'Grievance Center', icon: MessageSquareWarning, description: 'Citizen issue tracking' },
-  { id: 'booths', label: 'Booth Management', icon: Users, description: 'Karyakarta + voter mapping' },
-  { id: 'voters', label: 'Voter Database', icon: Shield, description: 'Import + predictive scoring' },
-  { id: 'content-factory', label: 'Content Factory', icon: Cpu, description: 'AI generated content' },
-  { id: 'agent-system', label: 'Auto Agents', icon: Bot, description: 'Autonomous task agents' },
-  { id: 'deepfake-shield', label: 'Deepfake Shield', icon: Lock, description: 'Misinformation defense' },
-]
 
 export function FounderDashboard() {
   const [parties, setParties] = useState<any[]>([])
@@ -55,38 +33,60 @@ export function FounderDashboard() {
 
   async function fetchData() {
     setLoading(true)
+    const results: any = {}
+
     try {
-      const [pRes, uRes, polRes, iRes, fRes, hRes] = await Promise.all([
-        api.list('parties'),
-        api.list('founder/users'),
-        api.list('politicians'),
-        api.list('integrations'),
-        api.get('/api/features/matrix'),
-        api.get('/api/founder/reports/political-health'),
-      ])
-      setParties(pRes.data || pRes || [])
-      setUsers(uRes.data || uRes || [])
-      setPoliticians(polRes.data || polRes || [])
-      setIntegrations(iRes.data || iRes || [])
-      setGlobalFeatures(fRes.global || [])
-      setHealth(hRes.summary || null)
-    } catch (e) {
-      console.error('[founder-dashboard] fetch error:', e)
-    } finally {
-      setLoading(false)
+      results.parties = await api.list('parties')
+    } catch (e: any) {
+      console.error('[founder-dashboard] parties error:', e)
+      results.parties = []
     }
+    try {
+      results.users = await api.list('founder/users')
+    } catch (e: any) {
+      console.error('[founder-dashboard] users error:', e)
+      results.users = []
+    }
+    try {
+      results.politicians = await api.list('politicians')
+    } catch (e: any) {
+      console.error('[founder-dashboard] politicians error:', e)
+      results.politicians = []
+    }
+    try {
+      results.integrations = await api.list('integrations')
+    } catch (e: any) {
+      console.error('[founder-dashboard] integrations error:', e)
+      results.integrations = []
+    }
+    try {
+      const f = await api.get('/api/features/matrix')
+      results.features = f.global || []
+    } catch (e: any) {
+      console.error('[founder-dashboard] features error:', e)
+      results.features = []
+    }
+    try {
+      results.health = await api.get('/api/founder/reports/political-health')
+    } catch (e: any) {
+      console.error('[founder-dashboard] health error:', e)
+      results.health = null
+    }
+
+    setParties(Array.isArray(results.parties) ? results.parties : [])
+    setUsers(Array.isArray(results.users) ? results.users : [])
+    setPoliticians(Array.isArray(results.politicians) ? results.politicians : [])
+    setIntegrations(Array.isArray(results.integrations) ? results.integrations : [])
+    setGlobalFeatures(Array.isArray(results.features) ? results.features : [])
+    setHealth(results.health?.summary || results.health || null)
+    setLoading(false)
   }
 
   useEffect(() => {
     fetchData()
   }, [])
 
-  const enabledCount = useMemo(() => {
-    return globalFeatures.filter((f) => f.is_active).length
-  }, [globalFeatures])
-
-  const totalFeatures = globalFeatures.length || 10
-
+  const enabledCount = useMemo(() => globalFeatures.filter((f) => f.is_active).length, [globalFeatures])
   const connectedIntegrations = useMemo(() => integrations.filter((i) => i.status === 'connected').length, [integrations])
 
   return (
@@ -104,10 +104,10 @@ export function FounderDashboard() {
       loading={loading}
       stats={
         <>
-          <StatCard label="Parties" value={parties.length} icon={Building2} delta={parties.filter((p) => p.subscription_status === 'active').length} deltaLabel="active" />
+          <StatCard label="Parties" value={parties.length} icon={Building2} delta={parties.filter((p) => p.is_active).length} deltaLabel="active" />
           <StatCard label="Politicians" value={politicians.length} icon={Shield} delta={politicians.filter((p) => p.is_active).length} deltaLabel="active" />
           <StatCard label="Active Users" value={users.filter((u) => u.is_active).length} icon={Users} delta={users.length} deltaLabel="total" />
-          <StatCard label="Features Enabled" value={`${enabledCount}/${totalFeatures}`} icon={ToggleRight} deltaLabel="globally" />
+          <StatCard label="Features Enabled" value={`${enabledCount}/${globalFeatures.length || 51}`} icon={ToggleRight} deltaLabel="globally" />
         </>
       }
     >
@@ -129,7 +129,7 @@ export function FounderDashboard() {
                     </div>
                     <div>
                       <p className="text-sm font-medium">{p.name}</p>
-                      <p className="text-xs text-muted-foreground">{p.politicians_count ?? 0} politicians · {p.users_count ?? 0} users · {p.subscription_plan || 'trial'} plan</p>
+                      <p className="text-xs text-muted-foreground">{p.subscription_plan?.toUpperCase() || 'NO PLAN'} · {p.subscription_status || 'unknown'}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -153,24 +153,15 @@ export function FounderDashboard() {
           }
         >
           <div className="grid gap-3 sm:grid-cols-2">
-            {ALL_FEATURES.map((f) => {
-              const Icon = f.icon
-              const enabled = globalFeatures.some((g) => g.feature_key === f.id && g.is_active)
-              return (
-                <div key={f.id} className="flex items-start justify-between rounded-md border p-3">
-                  <div className="flex items-start gap-3">
-                    <div className="rounded-md bg-muted p-2">
-                      <Icon className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">{f.label}</p>
-                      <p className="text-xs text-muted-foreground">{f.description}</p>
-                    </div>
-                  </div>
-                  <Badge variant={enabled ? 'success' : 'secondary'}>{enabled ? 'Enabled' : 'Disabled'}</Badge>
+            {globalFeatures.slice(0, 10).map((f) => (
+              <div key={f.id} className="flex items-start justify-between rounded-md border p-3">
+                <div>
+                  <p className="text-sm font-medium">{f.label}</p>
+                  <p className="text-xs text-muted-foreground">{f.description || 'No description'}</p>
                 </div>
-              )
-            })}
+                <Badge variant={f.is_active ? 'success' : 'secondary'}>{f.is_active ? 'Enabled' : 'Disabled'}</Badge>
+              </div>
+            ))}
           </div>
         </SectionCard>
       </div>
@@ -182,8 +173,8 @@ export function FounderDashboard() {
           action={<Badge variant={health?.critical ? 'warning' : 'success'}>{health?.critical ? `${health.critical} critical` : 'Healthy'}</Badge>}
         >
           <div className="space-y-2 text-sm">
-            <div className="flex justify-between"><span>Politicians</span><span className="font-medium">{health?.politicians ?? 0}</span></div>
-            <div className="flex justify-between"><span>Parties</span><span className="font-medium">{health?.parties ?? 0}</span></div>
+            <div className="flex justify-between"><span>Politicians</span><span className="font-medium">{health?.politicians ?? politicians.length}</span></div>
+            <div className="flex justify-between"><span>Parties</span><span className="font-medium">{health?.parties ?? parties.length}</span></div>
             <div className="flex justify-between"><span>Critical Alerts</span><span className={health?.critical ? 'font-medium text-danger' : 'font-medium'}>{health?.critical ?? 0}</span></div>
             <div className="flex justify-between"><span>Integrations</span><span className="font-medium">{connectedIntegrations}/{integrations.length} connected</span></div>
             <div className="flex justify-between"><span>API</span><span className="text-success">Operational</span></div>

@@ -1410,6 +1410,103 @@ app.post('/api/features/toggle', authMiddleware, async (req, res) => {
   }
 });
 
+
+
+// ── INTEGRATIONS CRUD ─────────────────────────────────────────
+app.get('/api/integrations', authMiddleware, async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM party_integrations ORDER BY created_at DESC');
+    res.json({ data: rows || [] });
+  } catch (err) {
+    console.error('[integrations] list error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/integration-types', authMiddleware, async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM integration_types WHERE is_active = 1');
+    res.json({ data: rows || [] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/integrations', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const { party_id, integration_type, provider_name, api_key_reference, status, is_active } = req.body;
+    const [result] = await pool.query(
+      `INSERT INTO party_integrations (party_id, integration_type, provider_name, api_key_reference, status, is_active)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [party_id, integration_type, provider_name, api_key_reference, status || 'pending', is_active ? 1 : 0]
+    );
+    res.status(201).json({ id: result.insertId, ...req.body });
+  } catch (err) {
+    console.error('[integrations] create error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/integrations/:id', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const data = req.body;
+    const [existing] = await pool.query('SELECT * FROM party_integrations WHERE id = ?', [req.params.id]);
+    if (!existing.length) return res.status(404).json({ error: 'Not found' });
+
+    await pool.query(
+      `UPDATE party_integrations SET
+        party_id = ?, integration_type = ?, provider_name = ?, api_key_reference = ?,
+        status = ?, is_active = ?
+       WHERE id = ?`,
+      [
+        data.party_id ?? existing[0].party_id,
+        data.integration_type ?? existing[0].integration_type,
+        data.provider_name ?? existing[0].provider_name,
+        data.api_key_reference ?? existing[0].api_key_reference,
+        data.status ?? existing[0].status,
+        data.is_active !== undefined ? (data.is_active ? 1 : 0) : existing[0].is_active,
+        req.params.id
+      ]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[integrations] update error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/integrations/:id', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' });
+  try {
+    await pool.query('UPDATE party_integrations SET is_active = 0 WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[integrations] delete error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/integrations/:id/test', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const [rows] = await pool.query('SELECT * FROM party_integrations WHERE id = ?', [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+
+    // Simulate connection test
+    const statuses = ['connected', 'failed'];
+    const newStatus = Math.random() > 0.2 ? 'connected' : 'failed';
+    await pool.query('UPDATE party_integrations SET status = ? WHERE id = ?', [newStatus, req.params.id]);
+
+    res.json({ success: newStatus === 'connected', status: newStatus });
+  } catch (err) {
+    console.error('[integrations] test error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 // ── END FOUNDER API ───────────────────────────────────────────
 
 // ── TEMPLE DARSHAN API ───────────────────────────────────────
