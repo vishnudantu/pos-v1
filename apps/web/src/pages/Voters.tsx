@@ -18,17 +18,17 @@ import {
   HelpCircle,
   ThumbsDown,
 } from 'lucide-react'
-import { api } from '../../lib/api'
-import { useAuth } from '../../lib/auth'
-import { Button } from '../../components/primitives/Button'
-import { Card, CardContent } from '../../components/primitives/Card'
-import { Badge } from '../../components/primitives/Badge'
-import { SectionCard } from '../../components/primitives/SectionCard'
-import { StatCard } from '../../components/primitives/StatCard'
-import { Loading } from '../../components/primitives/Loading'
-import { Modal } from '../../components/primitives/Modal'
-import { Input } from '../../components/primitives/Input'
-import { Select } from '../../components/primitives/Select'
+import { api } from '../lib/api'
+import { useAuth } from '../lib/auth'
+import { Button } from '../components/primitives/Button'
+import { Card, CardContent } from '../components/primitives/Card'
+import { Badge } from '../components/primitives/Badge'
+import { SectionCard } from '../components/primitives/SectionCard'
+import { StatCard } from '../components/primitives/StatCard'
+import { Loading } from '../components/primitives/Loading'
+import { Modal } from '../components/primitives/Modal'
+import { Input } from '../components/primitives/Input'
+import { Select } from '../components/primitives/Select'
 
 interface Voter {
   id: number
