@@ -5,7 +5,7 @@ import { api } from './api';
 export interface UserRole {
   id: string;
   email?: string;
-  role: 'super_admin' | 'politician_admin' | 'staff' | 'field_worker';
+  role: 'super_admin' | 'politician_admin' | 'staff' | 'field_worker' | 'mp' | 'mla' | 'mlc' | 'party_president' | 'state_committee' | 'central_committee' | 'karyakarta';
   politician_id: string | null;
   two_factor_enabled?: boolean;
   display_name?: string | null;
