@@ -85,6 +85,8 @@ export function FounderDashboard() {
     return globalFeatures.filter((f) => f.is_active).length
   }, [globalFeatures])
 
+  const totalFeatures = globalFeatures.length || 10
+
   const connectedIntegrations = useMemo(() => integrations.filter((i) => i.status === 'connected').length, [integrations])
 
   return (
@@ -105,7 +107,7 @@ export function FounderDashboard() {
           <StatCard label="Parties" value={parties.length} icon={Building2} delta={parties.filter((p) => p.subscription_status === 'active').length} deltaLabel="active" />
           <StatCard label="Politicians" value={politicians.length} icon={Shield} delta={politicians.filter((p) => p.is_active).length} deltaLabel="active" />
           <StatCard label="Active Users" value={users.filter((u) => u.is_active).length} icon={Users} delta={users.length} deltaLabel="total" />
-          <StatCard label="Features Enabled" value={`${enabledCount}/${ALL_FEATURES.length}`} icon={ToggleRight} deltaLabel="globally" />
+          <StatCard label="Features Enabled" value={`${enabledCount}/${totalFeatures}`} icon={ToggleRight} deltaLabel="globally" />
         </>
       }
     >
